@@ -139,6 +139,14 @@ def v4l2_fourcc(a, b, c, d):
     return ord(a) | (ord(b) << 8) | (ord(c) << 16) | (ord(d) << 24)
 
 
+def v4l2_fourcc2str(fourcc):
+    a = chr(fourcc & 0xFF)
+    b = chr((fourcc >> 8) & 0xFF)
+    c = chr((fourcc >> 16) & 0xFF)
+    d = chr((fourcc >> 24) & 0xFF)
+    return ''.join([a, b, c, d])
+
+
 v4l2_field = enum
 (
     V4L2_FIELD_ANY,
@@ -184,17 +192,21 @@ def V4L2_FIELD_HAS_BOTH(field):
 
 
 v4l2_buf_type = enum
-(
-    V4L2_BUF_TYPE_VIDEO_CAPTURE,
-    V4L2_BUF_TYPE_VIDEO_OUTPUT,
-    V4L2_BUF_TYPE_VIDEO_OVERLAY,
-    V4L2_BUF_TYPE_VBI_CAPTURE,
-    V4L2_BUF_TYPE_VBI_OUTPUT,
-    V4L2_BUF_TYPE_SLICED_VBI_CAPTURE,
-    V4L2_BUF_TYPE_SLICED_VBI_OUTPUT,
-    V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY,
-    V4L2_BUF_TYPE_PRIVATE,
-) = range(1, 9) + [0x80]
+(	V4L2_BUF_TYPE_VIDEO_CAPTURE,
+	V4L2_BUF_TYPE_VIDEO_OUTPUT,
+	V4L2_BUF_TYPE_VIDEO_OVERLAY,
+	V4L2_BUF_TYPE_VBI_CAPTURE,
+	V4L2_BUF_TYPE_VBI_OUTPUT,
+	V4L2_BUF_TYPE_SLICED_VBI_CAPTURE,
+	V4L2_BUF_TYPE_SLICED_VBI_OUTPUT,
+	V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY,
+	V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE,
+	V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
+	V4L2_BUF_TYPE_SDR_CAPTURE,
+	V4L2_BUF_TYPE_SDR_OUTPUT,
+	V4L2_BUF_TYPE_META_CAPTURE,
+	V4L2_BUF_TYPE_PRIVATE, # Deprecated, do not use.
+) = range(1, 14) + [0x80]
 
 
 v4l2_ctrl_type = enum
@@ -206,7 +218,16 @@ v4l2_ctrl_type = enum
     V4L2_CTRL_TYPE_INTEGER64,
     V4L2_CTRL_TYPE_CTRL_CLASS,
     V4L2_CTRL_TYPE_STRING,
-) = range(1, 8)
+    V4L2_CTRL_TYPE_BITMASK,
+	V4L2_CTRL_TYPE_INTEGER_MENU,
+) = range(1, 10)
+
+
+# Compound types are >= 0x0100
+V4L2_CTRL_COMPOUND_TYPES = 0x0100
+V4L2_CTRL_TYPE_U8	     = 0x0100
+V4L2_CTRL_TYPE_U16	     = 0x0101
+V4L2_CTRL_TYPE_U32	     = 0x0102
 
 
 v4l2_tuner_type = enum
@@ -222,20 +243,45 @@ v4l2_memory = enum
     V4L2_MEMORY_MMAP,
     V4L2_MEMORY_USERPTR,
     V4L2_MEMORY_OVERLAY,
-) = range(1, 4)
+    V4L2_MEMORY_DMABUF,
+) = range(1, 5)
 
 
 v4l2_colorspace = enum
 (
-    V4L2_COLORSPACE_SMPTE170M,
-    V4L2_COLORSPACE_SMPTE240M,
-    V4L2_COLORSPACE_REC709,
-    V4L2_COLORSPACE_BT878,
-    V4L2_COLORSPACE_470_SYSTEM_M,
-    V4L2_COLORSPACE_470_SYSTEM_BG,
-    V4L2_COLORSPACE_JPEG,
-    V4L2_COLORSPACE_SRGB,
-) = range(1, 9)
+    #Default colorspace, i.e. let the driver figure it out.
+    #Can only be used with video capture.
+	V4L2_COLORSPACE_DEFAULT,
+	# SMPTE 170M: used for broadcast NTSC/PAL SDTV
+	V4L2_COLORSPACE_SMPTE170M,
+	# Obsolete pre-1998 SMPTE 240M HDTV standard, superseded by Rec 709
+	V4L2_COLORSPACE_SMPTE240M,
+	# Rec.709: used for HDTV
+	V4L2_COLORSPACE_REC709,
+    #Deprecated, do not use. No driver will ever return this. This was
+    #based on a misunderstanding of the bt878 datasheet.
+	V4L2_COLORSPACE_BT878,
+    #NTSC 1953 colorspace. This only makes sense when dealing with
+    #really, really old NTSC recordings. Superseded by SMPTE 170M.
+	V4L2_COLORSPACE_470_SYSTEM_M,
+    #EBU Tech 3213 PAL/SECAM colorspace. This only makes sense when
+    #dealing with really old PAL/SECAM recordings. Superseded by
+    #SMPTE 170M.
+	V4L2_COLORSPACE_470_SYSTEM_BG,
+    #Effectively shorthand for V4L2_COLORSPACE_SRGB, V4L2_YCBCR_ENC_601
+    #and V4L2_QUANTIZATION_FULL_RANGE. To be used for (Motion-)JPEG.
+	V4L2_COLORSPACE_JPEG,
+	# For RGB colorspaces such as produces by most webcams.
+	V4L2_COLORSPACE_SRGB,
+	# AdobeRGB colorspace
+	V4L2_COLORSPACE_ADOBERGB,
+	# BT.2020 colorspace, used for UHDTV.
+	V4L2_COLORSPACE_BT2020,
+	# Raw colorspace: for RAW unprocessed images
+	V4L2_COLORSPACE_RAW,
+	# DCI-P3 colorspace, used by cinema projectors
+	V4L2_COLORSPACE_DCI_P3,
+) = range(0, 13)
 
 
 v4l2_priority = enum
@@ -283,26 +329,34 @@ class v4l2_capability(ctypes.Structure):
 # Values for 'capabilities' field
 #
 
-V4L2_CAP_VIDEO_CAPTURE = 0x00000001
-V4L2_CAP_VIDEO_OUTPUT = 0x00000002
-V4L2_CAP_VIDEO_OVERLAY = 0x00000004
-V4L2_CAP_VBI_CAPTURE = 0x00000010
-V4L2_CAP_VBI_OUTPUT = 0x00000020
-V4L2_CAP_SLICED_VBI_CAPTURE = 0x00000040
-V4L2_CAP_SLICED_VBI_OUTPUT = 0x00000080
-V4L2_CAP_RDS_CAPTURE = 0x00000100
-V4L2_CAP_VIDEO_OUTPUT_OVERLAY = 0x00000200
-V4L2_CAP_HW_FREQ_SEEK = 0x00000400
-V4L2_CAP_RDS_OUTPUT = 0x00000800
-
-V4L2_CAP_TUNER = 0x00010000
-V4L2_CAP_AUDIO = 0x00020000
-V4L2_CAP_RADIO = 0x00040000
-V4L2_CAP_MODULATOR = 0x00080000
-
-V4L2_CAP_READWRITE = 0x01000000
-V4L2_CAP_ASYNCIO = 0x02000000
-V4L2_CAP_STREAMING = 0x04000000
+V4L2_CAP_VIDEO_CAPTURE        = 0x00000001  # Is a video capture device
+V4L2_CAP_VIDEO_OUTPUT         = 0x00000002  # Is a video output device
+V4L2_CAP_VIDEO_OVERLAY        = 0x00000004  # Can do video overlay
+V4L2_CAP_VBI_CAPTURE          = 0x00000010  # Is a raw VBI capture device
+V4L2_CAP_VBI_OUTPUT           = 0x00000020  # Is a raw VBI output device
+V4L2_CAP_SLICED_VBI_CAPTURE   = 0x00000040  # Is a sliced VBI capture device
+V4L2_CAP_SLICED_VBI_OUTPUT    = 0x00000080  # Is a sliced VBI output device
+V4L2_CAP_RDS_CAPTURE          = 0x00000100  # RDS data capture
+V4L2_CAP_VIDEO_OUTPUT_OVERLAY = 0x00000200  # Can do video output overlay
+V4L2_CAP_HW_FREQ_SEEK         = 0x00000400  # Can do hardware frequency seek 
+V4L2_CAP_RDS_OUTPUT           = 0x00000800  # Is an RDS encoder
+V4L2_CAP_VIDEO_CAPTURE_MPLANE =	0x00001000  # Is a video capture device that supports multiplanar formats
+V4L2_CAP_VIDEO_OUTPUT_MPLANE  = 0x00002000  # Is a video output device that supports multiplanar formats
+V4L2_CAP_VIDEO_M2M_MPLANE     = 0x00004000  # Is a video mem-to-mem device that supports multiplanar formats
+V4L2_CAP_VIDEO_M2M            = 0x00008000  # Is a video mem-to-mem device
+V4L2_CAP_TUNER                = 0x00010000  # has a tuner
+V4L2_CAP_AUDIO                = 0x00020000  # has audio support
+V4L2_CAP_RADIO                = 0x00040000  # is a radio device
+V4L2_CAP_MODULATOR            = 0x00080000  # has a modulator 
+V4L2_CAP_SDR_CAPTURE		  = 0x00100000  # Is a SDR capture device
+V4L2_CAP_EXT_PIX_FORMAT		  = 0x00200000  # Supports the extended pixel format
+V4L2_CAP_SDR_OUTPUT		      = 0x00400000  # Is a SDR output device
+V4L2_CAP_META_CAPTURE		  = 0x00800000  # Is a metadata capture device
+V4L2_CAP_READWRITE            = 0x01000000  # read/write systemcalls
+V4L2_CAP_ASYNCIO              = 0x02000000  # async I/O
+V4L2_CAP_STREAMING            = 0x04000000  # streaming I/O ioctls
+V4L2_CAP_TOUCH                = 0x10000000  # Is a touch device
+V4L2_CAP_DEVICE_CAPS          = 0x80000000  # sets device capabilities field
 
 
 #
@@ -1030,6 +1084,7 @@ class v4l2_querymenu(ctypes.Structure):
     ]
 
 
+NONE = 0x0000
 V4L2_CTRL_FLAG_DISABLED = 0x0001
 V4L2_CTRL_FLAG_GRABBED = 0x0002
 V4L2_CTRL_FLAG_READ_ONLY = 0x0004
@@ -1037,8 +1092,12 @@ V4L2_CTRL_FLAG_UPDATE = 0x0008
 V4L2_CTRL_FLAG_INACTIVE = 0x0010
 V4L2_CTRL_FLAG_SLIDER = 0x0020
 V4L2_CTRL_FLAG_WRITE_ONLY = 0x0040
-
+V4L2_CTRL_FLAG_VOLATILE = 0x0080
+V4L2_CTRL_FLAG_HAS_PAYLOAD = 0x0100
+V4L2_CTRL_FLAG_EXECUTE_ON_WRITE = 0x0200
+V4L2_CTRL_FLAG_MODIFY_LAYOUT = 0x0400
 V4L2_CTRL_FLAG_NEXT_CTRL = 0x80000000
+V4L2_CTRL_FLAG_NEXT_COMPOUND = 0x40000000
 
 V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900
 V4L2_CID_USER_BASE = V4L2_CID_BASE
@@ -1912,3 +1971,132 @@ VIDIOC_G_AUDOUT_OLD = _IOWR('V', 49, v4l2_audioout)
 VIDIOC_CROPCAP_OLD = _IOR('V', 58, v4l2_cropcap)
 
 BASE_VIDIOC_PRIVATE = 192
+
+
+# Add by Jinlei 2017/5/30.    
+# The alternative of enum in python.
+v4l2_colorspace_dict = {0:'DEFAULT',
+                        1:'SMPTE170M',
+                        2:'SMPTE240M',
+                        3:'REC709',
+                        4:'BT878',
+                        5:'470_SYSTEM_M',
+                        6:'470_SYSTEM_BG',
+                        7:'JPEG',
+                        8:'SRGB',
+                        9:'ADOBERGB',
+                        10:'BT2020',
+                        11:'RAW',
+                        12:'DCI_P3'}
+
+# Add by Jinlei 2017/5/30.
+# The alternative of enum in python.                
+v4l2_field_dict = {0:'ANY',
+                   1:'NONE',
+                   2:'TOP',
+                   3:'BOTTOM',
+                   4:'INTERLACED',
+                   5:'SEQ_TB',
+                   6:'SEQ_BT',
+                   7:'ALTERNATE',
+                   8:'INTERLACED_TB',
+                   9:'INTERLACED_BT'}
+
+# Add by Jinlei 2017/5/31.
+v4l2_CID_dict = {V4L2_CID_BRIGHTNESS:'V4L2_CID_BRIGHTNESS',
+                       V4L2_CID_CONTRAST:'V4L2_CID_CONTRAST',
+                       V4L2_CID_SATURATION:'V4L2_CID_SATURATION',
+                       V4L2_CID_HUE:'V4L2_CID_HUE',
+                       V4L2_CID_AUTO_WHITE_BALANCE:'V4L2_CID_AUTO_WHITE_BALANCE',
+                       V4L2_CID_GAMMA:'V4L2_CID_GAMMA',
+                       V4L2_CID_GAIN:'V4L2_CID_GAIN',
+                       V4L2_CID_POWER_LINE_FREQUENCY:'V4L2_CID_POWER_LINE_FREQUENCY',
+                       V4L2_CID_WHITE_BALANCE_TEMPERATURE:'V4L2_CID_WHITE_BALANCE_TEMPERATURE',
+                       V4L2_CID_SHARPNESS:'V4L2_CID_SHARPNESS',
+                       V4L2_CID_BACKLIGHT_COMPENSATION:'V4L2_CID_BACKLIGHT_COMPENSATION',
+                       V4L2_CID_EXPOSURE_AUTO:'V4L2_CID_EXPOSURE_AUTO',
+                       V4L2_CID_EXPOSURE_ABSOLUTE:'V4L2_CID_EXPOSURE_ABSOLUTE',
+                       V4L2_CID_EXPOSURE_AUTO_PRIORITY:'V4L2_CID_EXPOSURE_AUTO_PRIORITY'}
+
+# Add by Jinlei 2017/5/31.
+v4l2_CTRL_FLAG_dict = {NONE:'NONE',
+                       V4L2_CTRL_FLAG_DISABLED:'V4L2_CTRL_FLAG_DISABLED',
+                       V4L2_CTRL_FLAG_GRABBED:'V4L2_CTRL_FLAG_GRABBED',
+                       V4L2_CTRL_FLAG_READ_ONLY:'V4L2_CTRL_FLAG_READ_ONLY',
+                       V4L2_CTRL_FLAG_UPDATE:'V4L2_CTRL_FLAG_UPDATE',
+                       V4L2_CTRL_FLAG_INACTIVE:'V4L2_CTRL_FLAG_INACTIVE',
+                       V4L2_CTRL_FLAG_SLIDER:'V4L2_CTRL_FLAG_SLIDER',
+                       V4L2_CTRL_FLAG_WRITE_ONLY:'V4L2_CTRL_FLAG_WRITE_ONLY',
+                       V4L2_CTRL_FLAG_VOLATILE:'V4L2_CTRL_FLAG_VOLATILE',
+                       V4L2_CTRL_FLAG_HAS_PAYLOAD:'V4L2_CTRL_FLAG_HAS_PAYLOAD',
+                       V4L2_CTRL_FLAG_EXECUTE_ON_WRITE:'V4L2_CTRL_FLAG_EXECUTE_ON_WRITE',
+                       V4L2_CTRL_FLAG_MODIFY_LAYOUT:'V4L2_CTRL_FLAG_MODIFY_LAYOUT',
+                       V4L2_CTRL_FLAG_NEXT_CTRL:'V4L2_CTRL_FLAG_NEXT_CTRL',
+                       V4L2_CTRL_FLAG_NEXT_COMPOUND:'V4L2_CTRL_FLAG_NEXT_COMPOUND'}
+
+# Add by Jinlei 2017/5/31.
+v4l2_ctrl_type_dict = {V4L2_CTRL_TYPE_INTEGER:'V4L2_CTRL_TYPE_INTEGER',
+                       V4L2_CTRL_TYPE_BOOLEAN:'V4L2_CTRL_TYPE_BOOLEAN',
+                       V4L2_CTRL_TYPE_MENU:'V4L2_CTRL_TYPE_MENU',
+                       V4L2_CTRL_TYPE_BUTTON:'V4L2_CTRL_TYPE_BUTTON',
+                       V4L2_CTRL_TYPE_INTEGER64:'V4L2_CTRL_TYPE_INTEGER64',
+                       V4L2_CTRL_TYPE_CTRL_CLASS:'V4L2_CTRL_TYPE_CTRL_CLASS',
+                       V4L2_CTRL_TYPE_STRING:'V4L2_CTRL_TYPE_STRING',
+                       V4L2_CTRL_TYPE_BITMASK:'V4L2_CTRL_TYPE_BITMASK',
+                       V4L2_CTRL_TYPE_INTEGER_MENU:'V4L2_CTRL_TYPE_INTEGER_MENU',
+                       V4L2_CTRL_COMPOUND_TYPES:'V4L2_CTRL_COMPOUND_TYPES',
+                       V4L2_CTRL_TYPE_U8:'V4L2_CTRL_TYPE_U8',
+                       V4L2_CTRL_TYPE_U16:'V4L2_CTRL_TYPE_U16',
+                       V4L2_CTRL_TYPE_U32:'V4L2_CTRL_TYPE_U32'}
+
+# Add by Jinlei 2017/5/31.
+v4l2_capabilities_dict = {V4L2_CAP_VIDEO_CAPTURE:'V4L2_CAP_VIDEO_CAPTURE',
+                          V4L2_CAP_VIDEO_OUTPUT:'V4L2_CAP_VIDEO_OUTPUT',
+                          V4L2_CAP_VIDEO_OVERLAY:'V4L2_CAP_VIDEO_OVERLAY',
+                          V4L2_CAP_VBI_CAPTURE:'V4L2_CAP_VBI_CAPTURE',
+                          V4L2_CAP_VBI_OUTPUT:'V4L2_CAP_VBI_OUTPUT',
+                          V4L2_CAP_SLICED_VBI_CAPTURE:'V4L2_CAP_SLICED_VBI_CAPTURE',
+                          V4L2_CAP_SLICED_VBI_OUTPUT:'V4L2_CAP_SLICED_VBI_OUTPUT',
+                          V4L2_CAP_RDS_CAPTURE:'V4L2_CAP_RDS_CAPTURE',
+                          V4L2_CAP_VIDEO_OUTPUT_OVERLAY:'V4L2_CAP_VIDEO_OUTPUT_OVERLAY',
+                          V4L2_CAP_HW_FREQ_SEEK:'V4L2_CAP_HW_FREQ_SEEK',
+                          V4L2_CAP_RDS_OUTPUT:'V4L2_CAP_RDS_OUTPUT',
+                          V4L2_CAP_VIDEO_CAPTURE_MPLANE:'V4L2_CAP_VIDEO_CAPTURE_MPLANE',
+                          V4L2_CAP_VIDEO_OUTPUT_MPLANE:'V4L2_CAP_VIDEO_OUTPUT_MPLANE',
+                          V4L2_CAP_VIDEO_M2M_MPLANE:'V4L2_CAP_VIDEO_M2M_MPLANE',
+                          V4L2_CAP_VIDEO_M2M:'V4L2_CAP_VIDEO_M2M',
+                          V4L2_CAP_TUNER:'V4L2_CAP_TUNER',
+                          V4L2_CAP_AUDIO:'V4L2_CAP_AUDIO',
+                          V4L2_CAP_RADIO:'V4L2_CAP_RADIO',
+                          V4L2_CAP_MODULATOR:'V4L2_CAP_MODULATOR',
+                          V4L2_CAP_SDR_CAPTURE:'V4L2_CAP_SDR_CAPTURE',
+                          V4L2_CAP_EXT_PIX_FORMAT:'V4L2_CAP_EXT_PIX_FORMAT',
+                          V4L2_CAP_SDR_OUTPUT:'V4L2_CAP_SDR_OUTPUT',
+                          V4L2_CAP_META_CAPTURE:'V4L2_CAP_META_CAPTURE',
+                          V4L2_CAP_READWRITE:'V4L2_CAP_READWRITE',
+                          V4L2_CAP_ASYNCIO:'V4L2_CAP_ASYNCIO',
+                          V4L2_CAP_STREAMING:'V4L2_CAP_STREAMING',
+                          V4L2_CAP_TOUCH:'V4L2_CAP_TOUCH',
+                          V4L2_CAP_DEVICE_CAPS:'V4L2_CAP_DEVICE_CAPS'}
+
+# Add by Jinlei 2017/6/1.
+v4l2_BUF_TYPE_dict = {V4L2_BUF_TYPE_VIDEO_CAPTURE:'V4L2_BUF_TYPE_VIDEO_CAPTURE',
+                      V4L2_BUF_TYPE_VIDEO_OUTPUT:'V4L2_BUF_TYPE_VIDEO_OUTPUT',
+                      V4L2_BUF_TYPE_VIDEO_OVERLAY:'V4L2_BUF_TYPE_VIDEO_OVERLAY',
+                      V4L2_BUF_TYPE_VBI_CAPTURE:'V4L2_BUF_TYPE_VBI_CAPTURE',
+                      V4L2_BUF_TYPE_VBI_OUTPUT:'V4L2_BUF_TYPE_VBI_OUTPUT',
+                      V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:'V4L2_BUF_TYPE_SLICED_VBI_CAPTURE',
+                      V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:'V4L2_BUF_TYPE_SLICED_VBI_OUTPUT',
+                      V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY:'V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY',
+                      V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:'V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE',
+                      V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:'V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE',
+                      V4L2_BUF_TYPE_SDR_CAPTURE:'V4L2_BUF_TYPE_SDR_CAPTURE',
+                      V4L2_BUF_TYPE_SDR_OUTPUT:'V4L2_BUF_TYPE_SDR_OUTPUT',
+                      V4L2_BUF_TYPE_META_CAPTURE:'V4L2_BUF_TYPE_META_CAPTURE',
+                      V4L2_BUF_TYPE_PRIVATE:'V4L2_BUF_TYPE_PRIVATE'}
+
+# Add by Jinlei 2017/6/1.
+v4l2_MEMORY_dict = {V4L2_MEMORY_MMAP:'V4L2_MEMORY_MMAP',
+                    V4L2_MEMORY_USERPTR:'V4L2_MEMORY_USERPTR',
+                    V4L2_MEMORY_OVERLAY:'V4L2_MEMORY_OVERLAY',
+                    V4L2_MEMORY_DMABUF:'V4L2_MEMORY_DMABUF'}
