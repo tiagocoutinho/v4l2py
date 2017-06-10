@@ -4,9 +4,9 @@ This is forked from http://launchpad.net/~python-v4l2-devel. The original packag
 
 python-v4l2 maintainers and contributors
 ========================================
-Tamas Kemenczy
-Pete Eberlein
-Vesselin Petkov
+* Tamas Kemenczy
+* Pete Eberlein
+* Vesselin Petkov
 
 python-v4l2
 ===========
