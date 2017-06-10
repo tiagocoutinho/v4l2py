@@ -8,6 +8,8 @@ python-v4l2 maintainers and contributors
 * Pete Eberlein
 * Vesselin Petkov
 
+Following is the original READMD.md content.
+
 python-v4l2
 ===========
 
