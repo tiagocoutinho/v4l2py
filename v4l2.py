@@ -1973,8 +1973,8 @@ VIDIOC_CROPCAP_OLD = _IOR('V', 58, v4l2_cropcap)
 BASE_VIDIOC_PRIVATE = 192
 
 
-# Add by Jinlei 2017/5/30.    
-# The alternative of enum in python.
+
+
 v4l2_colorspace_dict = {0:'DEFAULT',
                         1:'SMPTE170M',
                         2:'SMPTE240M',
@@ -1989,8 +1989,8 @@ v4l2_colorspace_dict = {0:'DEFAULT',
                         11:'RAW',
                         12:'DCI_P3'}
 
-# Add by Jinlei 2017/5/30.
-# The alternative of enum in python.                
+
+
 v4l2_field_dict = {0:'ANY',
                    1:'NONE',
                    2:'TOP',
@@ -2002,7 +2002,8 @@ v4l2_field_dict = {0:'ANY',
                    8:'INTERLACED_TB',
                    9:'INTERLACED_BT'}
 
-# Add by Jinlei 2017/5/31.
+
+
 v4l2_CID_dict = {V4L2_CID_BRIGHTNESS:'V4L2_CID_BRIGHTNESS',
                        V4L2_CID_CONTRAST:'V4L2_CID_CONTRAST',
                        V4L2_CID_SATURATION:'V4L2_CID_SATURATION',
@@ -2018,7 +2019,8 @@ v4l2_CID_dict = {V4L2_CID_BRIGHTNESS:'V4L2_CID_BRIGHTNESS',
                        V4L2_CID_EXPOSURE_ABSOLUTE:'V4L2_CID_EXPOSURE_ABSOLUTE',
                        V4L2_CID_EXPOSURE_AUTO_PRIORITY:'V4L2_CID_EXPOSURE_AUTO_PRIORITY'}
 
-# Add by Jinlei 2017/5/31.
+
+
 v4l2_CTRL_FLAG_dict = {NONE:'NONE',
                        V4L2_CTRL_FLAG_DISABLED:'V4L2_CTRL_FLAG_DISABLED',
                        V4L2_CTRL_FLAG_GRABBED:'V4L2_CTRL_FLAG_GRABBED',
@@ -2034,7 +2036,8 @@ v4l2_CTRL_FLAG_dict = {NONE:'NONE',
                        V4L2_CTRL_FLAG_NEXT_CTRL:'V4L2_CTRL_FLAG_NEXT_CTRL',
                        V4L2_CTRL_FLAG_NEXT_COMPOUND:'V4L2_CTRL_FLAG_NEXT_COMPOUND'}
 
-# Add by Jinlei 2017/5/31.
+
+
 v4l2_ctrl_type_dict = {V4L2_CTRL_TYPE_INTEGER:'V4L2_CTRL_TYPE_INTEGER',
                        V4L2_CTRL_TYPE_BOOLEAN:'V4L2_CTRL_TYPE_BOOLEAN',
                        V4L2_CTRL_TYPE_MENU:'V4L2_CTRL_TYPE_MENU',
@@ -2049,7 +2052,8 @@ v4l2_ctrl_type_dict = {V4L2_CTRL_TYPE_INTEGER:'V4L2_CTRL_TYPE_INTEGER',
                        V4L2_CTRL_TYPE_U16:'V4L2_CTRL_TYPE_U16',
                        V4L2_CTRL_TYPE_U32:'V4L2_CTRL_TYPE_U32'}
 
-# Add by Jinlei 2017/5/31.
+
+
 v4l2_capabilities_dict = {V4L2_CAP_VIDEO_CAPTURE:'V4L2_CAP_VIDEO_CAPTURE',
                           V4L2_CAP_VIDEO_OUTPUT:'V4L2_CAP_VIDEO_OUTPUT',
                           V4L2_CAP_VIDEO_OVERLAY:'V4L2_CAP_VIDEO_OVERLAY',
@@ -2079,7 +2083,7 @@ v4l2_capabilities_dict = {V4L2_CAP_VIDEO_CAPTURE:'V4L2_CAP_VIDEO_CAPTURE',
                           V4L2_CAP_TOUCH:'V4L2_CAP_TOUCH',
                           V4L2_CAP_DEVICE_CAPS:'V4L2_CAP_DEVICE_CAPS'}
 
-# Add by Jinlei 2017/6/1.
+
 v4l2_BUF_TYPE_dict = {V4L2_BUF_TYPE_VIDEO_CAPTURE:'V4L2_BUF_TYPE_VIDEO_CAPTURE',
                       V4L2_BUF_TYPE_VIDEO_OUTPUT:'V4L2_BUF_TYPE_VIDEO_OUTPUT',
                       V4L2_BUF_TYPE_VIDEO_OVERLAY:'V4L2_BUF_TYPE_VIDEO_OVERLAY',
@@ -2095,7 +2099,7 @@ v4l2_BUF_TYPE_dict = {V4L2_BUF_TYPE_VIDEO_CAPTURE:'V4L2_BUF_TYPE_VIDEO_CAPTURE',
                       V4L2_BUF_TYPE_META_CAPTURE:'V4L2_BUF_TYPE_META_CAPTURE',
                       V4L2_BUF_TYPE_PRIVATE:'V4L2_BUF_TYPE_PRIVATE'}
 
-# Add by Jinlei 2017/6/1.
+
 v4l2_MEMORY_dict = {V4L2_MEMORY_MMAP:'V4L2_MEMORY_MMAP',
                     V4L2_MEMORY_USERPTR:'V4L2_MEMORY_USERPTR',
                     V4L2_MEMORY_OVERLAY:'V4L2_MEMORY_OVERLAY',
