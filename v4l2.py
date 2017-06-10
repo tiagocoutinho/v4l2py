@@ -1069,7 +1069,7 @@ class v4l2_queryctrl(ctypes.Structure):
         ('minimum', ctypes.c_int32),
         ('maximum', ctypes.c_int32),
         ('step', ctypes.c_int32),
-        ('default', ctypes.c_int32),
+        ('default_value', ctypes.c_int32),
         ('flags', ctypes.c_uint32),
         ('reserved', ctypes.c_uint32 * 2),
     ]
