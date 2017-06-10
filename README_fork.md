@@ -1,6 +1,6 @@
 
 
-declaration
+Declaration
 ========================================
 This is forked from http://launchpad.net/~python-v4l2-devel.
 The original package is not updated for a long time.
