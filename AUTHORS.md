@@ -6,6 +6,6 @@ python-v4l2 maintainers and contributors
 
 http://launchpad.net/~python-v4l2-devel
 
-Maintainer on Github
+maintainer of revised version on Github
 ========================================
 * Jinle Zheng
