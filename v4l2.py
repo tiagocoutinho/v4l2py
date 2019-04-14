@@ -206,7 +206,7 @@ v4l2_buf_type = enum
 	V4L2_BUF_TYPE_SDR_OUTPUT,
 	V4L2_BUF_TYPE_META_CAPTURE,
 	V4L2_BUF_TYPE_PRIVATE, # Deprecated, do not use.
-) = range(1, 14) + [0x80]
+) = list(range(1, 14)) + [0x80]
 
 
 v4l2_ctrl_type = enum
@@ -291,7 +291,7 @@ v4l2_priority = enum
     V4L2_PRIORITY_INTERACTIVE,
     V4L2_PRIORITY_RECORD,
     V4L2_PRIORITY_DEFAULT,
-) = range(0, 4) + [2]
+) = list(range(0, 4)) + [2]
 
 
 class v4l2_rect(ctypes.Structure):
