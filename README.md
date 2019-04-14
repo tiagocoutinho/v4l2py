@@ -1,10 +1,16 @@
 Declaration
 ===========
-This is forked from http://launchpad.net/~python-v4l2-devel. The original package is not updated for a long time. In this fork, I update the v4l2.py code to make it compatible to the latest videodev2.h header file.
+Forked from [AlexJinlei/python-v4l2](https://github.com/AlexJinlei/python-v4l2) and updated to work with Python 3.
 
-Jinlei Zheng
+Can be installed with:
+```
+pip3 install git+https://github.com/aspotton/python3-v4l2.git
+```
 
-2017/06/10
+The orignal declaration from AlexJinlei follows:
+> This is forked from http://launchpad.net/~python-v4l2-devel. The original package is not updated for a long time. In this fork, I update the v4l2.py code to make it compatible to the latest videodev2.h header file.
+> Jinlei Zheng
+> 2017/06/10
 
 
 Following is the original READMD.md content
