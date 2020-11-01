@@ -13,7 +13,7 @@ The orignal declaration from AlexJinlei follows:
 > 2017/06/10
 
 
-Following is the original READMD.md content
+Following are updated README.md contents
 ===========================================
 
 python-v4l2
@@ -24,7 +24,7 @@ ctypes.  Basic example usage::
 
     >>> import v4l2
     >>> import fcntl
-    >>> vd = open('/dev/video0', 'rw')
+    >>> vd = open('/dev/video0', 'w')
     >>> cp = v4l2.v4l2_capability()
     >>> fcntl.ioctl(vd, v4l2.VIDIOC_QUERYCAP, cp)
     0
