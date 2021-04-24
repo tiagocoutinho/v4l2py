@@ -71,10 +71,6 @@ class Memory(IntEnum):
     DMABUF = raw.V4L2_MEMORY_DMABUF
 
 
-def _structure_to_dict(structure):
-    return dict((field, getattr(structure, field)) for field, _ in structure._fields_)
-
-
 class Device:
 
     def __init__(self, filename):
@@ -137,9 +133,12 @@ class Device:
     def capabilities(self):
         cp = raw.v4l2_capability()
         fcntl.ioctl(self, raw.VIDIOC_QUERYCAP, cp)
-        result = _structure_to_dict(cp)
-        result["capabilities"] = Capability(cp.capabilities)
-        return result
+        return dict(
+            driver=cp.driver,
+            card=cp.card,
+            bus_info=cp.bus_info,
+            version=cp.version,
+            capabilities=Capability(cp.capabilities))
 
     @property
     def supported_formats(self):
