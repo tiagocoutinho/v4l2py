@@ -109,14 +109,14 @@ class Device:
 
     def open(self):
         if self._fd is not None:
-            raise RuntimeError("Device already opened!")
+            raise IOError("Device already opened!")
         self._fd = os.open(self.filename, os.O_RDWR | os.O_NONBLOCK)
 
     def close(self):
         if self._buffers:
             self.stop()
             for buff in self._buffers:
-                buff['mmap'].close()
+                buff["mmap"].close()
             self._buffers = None
         if self._fd is not None:
             os.close(self._fd)
