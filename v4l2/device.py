@@ -107,6 +107,10 @@ class Device:
     def _ioctl(self, request, arg=0):
         return fcntl.ioctl(self.fileno(), request, arg)
 
+    @classmethod
+    def from_id(self, did):
+        return Device("/dev/video{}".format(did))
+
     def open(self):
         if self._fd is not None:
             raise IOError("Device already opened!")
