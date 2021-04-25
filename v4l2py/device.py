@@ -4,6 +4,7 @@ import mmap
 import errno
 import fcntl
 import select
+import pathlib
 import collections
 
 from . import raw
@@ -391,4 +392,15 @@ async def VideoStreamAsync(video_capture):
         finally:
             video_capture.stop()
             loop.remove_reader(fd)
+
+
+def iter_devices(path="/dev"):
+    path = pathlib.Path(path)
+    files = path.glob("video*")
+    return (Device(name) for name in files)
+
+
+def iter_video_capture_devices(path="/dev"):
+    f = lambda d: Capability.VIDEO_CAPTURE in d.info.capabilities
+    return filter(f, iter_devices(path))
 
