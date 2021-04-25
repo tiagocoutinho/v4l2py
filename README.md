@@ -87,13 +87,13 @@ app = flask.Flask('basic-web-cam')
 
 def gen_frames():
     with Device.from_id(0) as cam:
-        video_capture.set_format(640, 480, 'MJPG')
-        for frame in cam.video_capture:
+        cam.video_capture.set_format(640, 480, 'MJPG')
+        for frame in cam:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
 
 @app.route("/")
 def index():
-    return '<!DOCTYPE html><html><body><img src="/stream" /></body></html>'
+    return '<html><img src="/stream" /></html>'
 
 @app.route("/stream")
 def stream():
