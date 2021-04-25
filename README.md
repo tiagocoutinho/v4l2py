@@ -50,26 +50,23 @@ Getting information about the device:
 >>> from v4l2py import Device
 
 >>> cam = Device.from_id(0)
+
+>>> # Info is available at any time
+>>> cam.info.card
+'Integrated_Webcam_HD: Integrate'
+
+>>> cam.info.capabilities
+<Capability.STREAMING|EXT_PIX_FORMAT|VIDEO_CAPTURE: 69206017>
+
+>>> cam.info.formats
+[ImageFormat(type=<BufferType.VIDEO_CAPTURE: 1>, description=b'Motion-JPEG',
+             flags=<ImageFormatFlag.COMPRESSED: 1>, pixelformat=<PixelFormat.MJPEG: 1196444237>),
+ ImageFormat(type=<BufferType.VIDEO_CAPTURE: 1>, description=b'YUYV 4:2:2',
+             flags=<ImageFormatFlag.0: 0>, pixelformat=<PixelFormat.YUYV: 1448695129>)]
+
+>>> # Current configuration must be retrieved from an open device
 >>> cam.open()
-
->>> cam.capabilities
-{'driver': b'uvcvideo',
- 'card': b'Integrated_Webcam_HD: Integrate',
- 'bus_info': b'usb-0000:00:14.0-6',
- 'version': 328798,
- 'capabilities': <STREAMING|META_CAPTURE|EXT_PIX_FORMAT|VIDEO_CAPTURE: 2225078273>}
-
->>> cam.supported_formats
- [{'type': <BufferType.VIDEO_CAPTURE: 1>,
-  'flags': <ImageFormatFlag.COMPRESSED: 1>,
-  'description': b'Motion-JPEG',
-  'pixelformat': 1196444237},
- {'type': <BufferType.VIDEO_CAPTURE: 1>,
-  'flags': <ImageFormatFlag.0: 0>,
-  'description': b'YUYV 4:2:2',
-  'pixelformat': 1448695129}]
-
->>> cam.get_format()
+>>> cam.video_capture.get_format()
 {'width': 640, 'height': 480, 'pixelformat': 'MJPG'}
 ```
 
@@ -93,8 +90,8 @@ app = flask.Flask('basic-web-cam')
 
 def gen_frames():
     with Device.from_id(0) as cam:
-        cam.set_format(640, 480, 'MJPG')
-        for frame in cam:
+        video_capture.set_format(640, 480, 'MJPG')
+        for frame in cam.video_capture:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
 
 @app.route("/")
@@ -105,14 +102,12 @@ def index():
 def stream():
     return flask.Response(
         gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-app.run(host="0.0.0.0")
 ```
 
 run with:
 
 ```bash
-$ python web.py
+$ FLASK_APP=web flask run
 ```
 
 Point your browser to [127.0.0.1:5000](http://127.0.0.1:5000) and you should see

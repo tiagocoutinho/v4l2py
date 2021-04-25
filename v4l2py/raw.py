@@ -205,8 +205,7 @@ v4l2_buf_type = enum
 	V4L2_BUF_TYPE_SDR_CAPTURE,
 	V4L2_BUF_TYPE_SDR_OUTPUT,
 	V4L2_BUF_TYPE_META_CAPTURE,
-	V4L2_BUF_TYPE_PRIVATE, # Deprecated, do not use.
-) = list(range(1, 14)) + [0x80]
+) = range(1, 14)
 
 
 v4l2_ctrl_type = enum
@@ -321,7 +320,8 @@ class v4l2_capability(ctypes.Structure):
         ('bus_info', ctypes.c_char * 32),
         ('version', ctypes.c_uint32),
         ('capabilities', ctypes.c_uint32),
-        ('reserved', ctypes.c_uint32 * 4),
+        ('device_caps', ctypes.c_uint32),
+        ('reserved', ctypes.c_uint32 * 3),
     ]
 
 
