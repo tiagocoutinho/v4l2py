@@ -51,7 +51,6 @@ Getting information about the device:
 
 >>> cam = Device.from_id(0)
 
->>> # Info is available at any time
 >>> cam.info.card
 'Integrated_Webcam_HD: Integrate'
 
@@ -64,8 +63,6 @@ Getting information about the device:
  ImageFormat(type=<BufferType.VIDEO_CAPTURE: 1>, description=b'YUYV 4:2:2',
              flags=<ImageFormatFlag.0: 0>, pixelformat=<PixelFormat.YUYV: 1448695129>)]
 
->>> # Current configuration must be retrieved from an open device
->>> cam.open()
 >>> cam.video_capture.get_format()
 {'width': 640, 'height': 480, 'pixelformat': 'MJPG'}
 ```

@@ -88,15 +88,16 @@ def read_info(fd):
 class Device:
 
     def __init__(self, filename):
-        self._fd = None
-        self._info = None
         self._context_level = 0
+        self._fd = os.open(filename, os.O_RDWR | os.O_NONBLOCK)
+        self.info = read_info(self._fd)
         self.filename = filename
-        self.video_capture = VideoCapture(self)
+        if Capability.VIDEO_CAPTURE in self.info.capabilities:
+            self.video_capture = VideoCapture(self)
+        else:
+            self.video_capture = None
 
     def __enter__(self):
-        if not self._context_level:
-            self.open()
         self._context_level += 1
         return self
 
@@ -106,9 +107,7 @@ class Device:
             self.close()
 
     def __iter__(self):
-        with self:
-            for frame in self.video_capture:
-                yield frame
+        return iter(self.video_capture)
 
     def _ioctl(self, request, arg=0):
         return fcntl.ioctl(self, request, arg)
@@ -117,13 +116,7 @@ class Device:
     def from_id(self, did):
         return Device("/dev/video{}".format(did))
 
-    def open(self):
-        if self._fd is not None:
-            raise IOError("Device already opened!")
-        self._fd = os.open(self.filename, os.O_RDWR | os.O_NONBLOCK)
-
     def close(self):
-        self.video_capture.close()
         if self._fd is not None:
             os.close(self._fd)
             self._fd = None
@@ -135,192 +128,18 @@ class Device:
     def closed(self):
         return self._fd is None
 
-    @property
-    def info(self):
-        if self._info is None:
-            with self:
-                self._info = read_info(self)
-        return self._info
-
-
-class BaseBuffer:
-
-    def __init__(self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True):
-        self.device = device
-        self.index = index
-        self.buffer_type = buffer_type
-        self.queue = queue
-        self._context_level = 0
-
-    def _buffer(self):
-        buff = raw.v4l2_buffer()
-        buff.index = self.index
-        buff.type = self.buffer_type
-        return buff
-
-    def __enter__(self):
-        if not self._context_level:
-            self.open()
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
-
-    def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request.value, arg=arg)
-
-    def open(self):
-        pass
-
-    def close(self):
-        pass
-
-
-class BufferMMAP(BaseBuffer):
-
-    mmap = None
-
-    def _buffer(self):
-        buff = super()._buffer()
-        buff.memory = Memory.MMAP
-        return buff
-
-    def open(self):
-        if self.mmap is not None:
-            raise ValueError("Buffer are already created")
-        buff = self._buffer()
-        self._ioctl(IOC.QUERYBUF, buff)
-        self.mmap = mmap.mmap(self.device.fileno(), buff.length, offset=buff.m.offset)
-        self.length = buff.length
-        if self.queue:
-            self._ioctl(IOC.QBUF, buff)
-
-    def close(self):
-        if self.mmap is not None:
-            self.mmap.close()
-            self.mmap = None
-
-    def raw_read(self, buff):
-        if self.mmap is None:
-            raise ValueError("Buffer has not been created")
-        result = self.mmap[:buff.bytesused]
-        if self.queue:
-            self._ioctl(IOC.QBUF, buff)
-        return result
-
-    def read(self, buff):
-        select.select((self.device,), (), ())
-        return self.raw_read(buff)
-
-
-class Buffers:
-
-    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE,
-                 buffer_size=1, buffer_queue=True, memory=Memory.MMAP):
-        self.device = device
-        self.buffer_size = buffer_size
-        self.buffer_type = buffer_type
-        self.buffer_queue = buffer_queue
-        self.memory = memory
-        self._buffers = None
-        self._context_level = 0
-
-    def __enter__(self):
-        if not self._context_level:
-            self.open()
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
-
-    def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request.value, arg=arg)
-
-    def _create_buffer(self, index):
-        if self.memory != Memory.MMAP:
-            raise TypeError(f"Unsupported buffer type {self.memory.name!r}")
-        buff = BufferMMAP(self.device, index, self.buffer_type, self.buffer_queue)
-        buff.open()
-        return buff
-
-    def _create_buffers(self):
-        if self._buffers:
-            raise ValueError("Buffers are already created")
-        r = raw.v4l2_requestbuffers()
-        r.count = self.buffer_size
-        r.type = self.buffer_type
-        r.memory = self.memory
-        self._ioctl(IOC.REQBUFS, r)
-        if not r.count:
-            raise IOError("Not enough buffer memory")
-        self._buffers = [self._create_buffer(idx) for idx in range(r.count)]
-
-    def open(self):
-        self._create_buffers()
-
-    def close(self):
-        if self._buffers:
-            for buff in self._buffers:
-                buff.close()
-            self._buffers = None
-
-    def raw_read(self):
-        if not self._buffers:
-            raise ValueError("Buffers have not been created")
-        buff = raw.v4l2_buffer()
-        buff.type = self.buffer_type
-        buff.memory = Memory.MMAP
-        self._ioctl(IOC.DQBUF, buff)
-        return self._buffers[buff.index].raw_read(buff)
-
-    def read(self):
-        select.select((self.device,), (), ())
-        return self.raw_read()
-
 
 class VideoCapture:
 
-    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE, buffer_size=1,
-                 buffer_queue=True, memory=Memory.MMAP):
+    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE):
         self.device = device
         self.buffer_type = buffer_type
-        self._buffers = Buffers(device, buffer_type, buffer_size, buffer_queue, memory)
-        self._context_level = 0
-
-    def __enter__(self):
-        if not self._context_level:
-            self.open()
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
 
     def __iter__(self):
-        with self:
-            self.start()
-            try:
-                while True:
-                    yield self.read()
-            finally:
-                self.stop()
+        return iter(VideoStream(self))
 
     def _ioctl(self, request, arg=0):
         return self.device._ioctl(request.value, arg=arg)
-
-    def open(self):
-        self._buffers.open()
-
-    def close(self):
-        self._buffers.close()
 
     @property
     def formats(self):
@@ -369,30 +188,186 @@ class VideoCapture:
         btype = raw.v4l2_buf_type(self.buffer_type)
         self._ioctl(IOC.STREAMOFF, btype)
 
+
+class BaseBuffer:
+
+    def __init__(self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True):
+        self._context_level = 0
+        self.device = device
+        self.index = index
+        self.buffer_type = buffer_type
+        self.queue = queue
+
+    def _v4l2_buffer(self):
+        buff = raw.v4l2_buffer()
+        buff.index = self.index
+        buff.type = self.buffer_type
+        return buff
+
+    def __enter__(self):
+        self._context_level += 1
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self._context_level -= 1
+        if not self._context_level:
+            self.close()
+
+    def _ioctl(self, request, arg=0):
+        return self.device._ioctl(request.value, arg=arg)
+
+    def close(self):
+        pass
+
+
+class BufferMMAP(BaseBuffer):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        buff = self._v4l2_buffer()
+        self._ioctl(IOC.QUERYBUF, buff)
+        self.mmap = mmap.mmap(self.device.fileno(), buff.length, offset=buff.m.offset)
+        self.length = buff.length
+        if self.queue:
+            self._ioctl(IOC.QBUF, buff)
+
+    def _v4l2_buffer(self):
+        buff = super()._v4l2_buffer()
+        buff.memory = Memory.MMAP
+        return buff
+
+    def close(self):
+        if self.mmap is not None:
+            self.mmap.close()
+            self.mmap = None
+
+    def raw_read(self, buff):
+        result = self.mmap[:buff.bytesused]
+        if self.queue:
+            self._ioctl(IOC.QBUF, buff)
+        return result
+
+    def read(self, buff):
+        select.select((self.device,), (), ())
+        return self.raw_read(buff)
+
+
+class Buffers:
+
+    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE,
+                 buffer_size=1, buffer_queue=True, memory=Memory.MMAP):
+        self._context_level = 0
+        self.device = device
+        self.buffer_size = buffer_size
+        self.buffer_type = buffer_type
+        self.buffer_queue = buffer_queue
+        self.memory = memory
+        self.buffers = self._create_buffers()
+
+    def __enter__(self):
+        self._context_level += 1
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self._context_level -= 1
+        if not self._context_level:
+            self.close()
+
+    def _ioctl(self, request, arg=0):
+        return self.device._ioctl(request.value, arg=arg)
+
+    def _create_buffers(self):
+        if self.memory != Memory.MMAP:
+            raise TypeError(f"Unsupported buffer type {self.memory.name!r}")
+        r = raw.v4l2_requestbuffers()
+        r.count = self.buffer_size
+        r.type = self.buffer_type
+        r.memory = self.memory
+        self._ioctl(IOC.REQBUFS, r)
+        if not r.count:
+            raise IOError("Not enough buffer memory")
+        return [
+            BufferMMAP(self.device, index, self.buffer_type, self.buffer_queue)
+            for index in range(r.count)
+        ]
+
+    def close(self):
+        if self.buffers:
+            for buff in self.buffers:
+                buff.close()
+            self.buffers = None
+
     def raw_read(self):
-        return self._buffers.raw_read()
+        buff = self.buffers[0]._v4l2_buffer()
+        self._ioctl(IOC.DQBUF, buff)
+        return self.buffers[buff.index].raw_read(buff)
 
     def read(self):
-        return self._buffers.read()
+        select.select((self.device,), (), ())
+        return self.raw_read()
 
 
-async def VideoStreamAsync(video_capture):
+class VideoStream:
+
+    def __init__(self, video_capture, buffer_size=1, buffer_queue=True,
+                 memory=Memory.MMAP):
+        self._context_level = 0
+        self.video_capture = video_capture
+        self.buffers = Buffers(
+            video_capture.device, video_capture.buffer_type,
+            buffer_size, buffer_queue, memory)
+
+    def __enter__(self):
+        self._context_level += 1
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self._context_level -= 1
+        if not self._context_level:
+            self.close()
+
+    def __iter__(self):
+        return Stream(self)
+
+    async def __aiter__(self):
+        async for frame in AsyncStream(self):
+            yield frame
+
+    def close(self):
+        self.buffers.close()
+
+    def raw_read(self):
+        return self.buffers.raw_read()
+
+    def read(self):
+        return self.buffers.read()
+
+
+def Stream(stream):
+    stream.video_capture.start()
+    try:
+        while True:
+            yield stream.read()
+    finally:
+        stream.video_capture.stop()
+
+
+async def AsyncStream(stream):
     import asyncio
+    cap = stream.video_capture
+    fd = cap.device.fileno()
     loop = asyncio.get_event_loop()
     event = asyncio.Event()
-    fd = video_capture.device.fileno()
-    with video_capture:
-        loop.add_reader(fd, event.set)
-        try:
-            video_capture.start()
-            while True:
-                await event.wait()
-                event.clear()
-                yield video_capture.raw_read()
-        finally:
-            video_capture.stop()
-            loop.remove_reader(fd)
-
+    loop.add_reader(fd, event.set)
+    try:
+        cap.start()
+        while True:
+            await event.wait()
+            event.clear()
+            yield stream.raw_read()
+    finally:
+        cap.stop()
+        loop.remove_reader(fd)
 
 def iter_devices(path="/dev"):
     path = pathlib.Path(path)
