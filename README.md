@@ -64,7 +64,7 @@ Getting information about the device:
              flags=<ImageFormatFlag.0: 0>, pixelformat=<PixelFormat.YUYV: 1448695129>)]
 
 >>> cam.video_capture.get_format()
-{'width': 640, 'height': 480, 'pixelformat': 'MJPG'}
+Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 ```
 
 

@@ -33,6 +33,9 @@ ImageFormat = collections.namedtuple(
     "ImageFormat", "type description flags pixelformat")
 
 
+Format = collections.namedtuple("Format", "width height pixelformat")
+
+
 def read_info(fd):
     caps = raw.v4l2_capability()
     fcntl.ioctl(fd, IOC.QUERYCAP.value, caps)
@@ -161,10 +164,10 @@ class VideoCapture:
         f = raw.v4l2_format()
         f.type = self.buffer_type
         self._ioctl(IOC.G_FMT, f)
-        return dict(
+        return Format(
             width=f.fmt.pix.width,
             height=f.fmt.pix.height,
-            pixelformat=raw.v4l2_fourcc2str(f.fmt.pix.pixelformat)
+            pixelformat=PixelFormat(f.fmt.pix.pixelformat)
         )
 
     def set_fps(self, fps):
