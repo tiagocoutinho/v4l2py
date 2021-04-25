@@ -1,14 +1,14 @@
 # v4l2py
 
-Forked from [aspotton/python-v4l2](https://github.com/aspotton/python-v4l2).
+Video for linux 2 (V4L2) python library
 
 A two purpose API:
 
+* high level Device API for humans to play with :-)
 * raw python binding for the v4l2 (video4linux2) userspace API, using ctypes (don't even
   bother wasting your time here. You probably won't use it)
-* high level Device API for humans to play with :-)
 
-Only works on python 3 (probably >=3.6).
+Only works on python >= 3.7.
 
 
 ## Installation
@@ -104,14 +104,16 @@ def stream():
 run with:
 
 ```bash
-$ FLASK_APP=web flask run
+$ FLASK_APP=web flask run -h 0.0.0.0
 ```
 
 Point your browser to [127.0.0.1:5000](http://127.0.0.1:5000) and you should see
 your camera rolling!
 
 
+## References
+
 See the ``linux/videodev2.h`` header file for details.
 
-* `Video for Linux Two Specification <http://linuxtv.org/downloads/v4l-dvb-apis/ch07s02.html>`_
-* `Reporting bugs <http://bugs.launchpad.net/python-v4l2>`_
+
+* `Video for Linux Two Specification <http://linuxtv.org/downloads/v4l-dvb-apis/ch07s02.html>`

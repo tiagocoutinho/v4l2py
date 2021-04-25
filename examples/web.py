@@ -1,4 +1,10 @@
-# run from this directory with: FLASK_APP=web flask run
+#
+# This file is part of the v4l2py project
+#
+# Copyright (c) 2021 Tiago Coutinho
+# Distributed under the GPLv3 license. See LICENSE for more info.
+
+# run from this directory with: FLASK_APP=web flask run -h 0.0.0.0
 
 import flask
 from v4l2py import Device
@@ -19,3 +25,6 @@ def index():
 def stream():
     return flask.Response(
         gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")
