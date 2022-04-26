@@ -461,10 +461,14 @@ async def AsyncStream(stream):
         cap.stop()
         loop.remove_reader(fd)
 
-def iter_devices(path="/dev"):
+
+def iter_video_files(path="/dev"):
     path = pathlib.Path(path)
-    files = path.glob("video*")
-    return (Device(name) for name in files)
+    return path.glob("video*")
+
+
+def iter_devices(path="/dev"):
+    return (Device(name) for name in iter_video_files(path=path))
 
 
 def iter_video_capture_devices(path="/dev"):
