@@ -276,8 +276,9 @@ class VideoCapture:
         self._ioctl(IOC.STREAMON, btype)
 
     def stop(self):
-        btype = raw.v4l2_buf_type(self.buffer_type)
-        self._ioctl(IOC.STREAMOFF, btype)
+        if not self.device.closed:
+            btype = raw.v4l2_buf_type(self.buffer_type)
+            self._ioctl(IOC.STREAMOFF, btype)
 
 
 class BaseBuffer:
