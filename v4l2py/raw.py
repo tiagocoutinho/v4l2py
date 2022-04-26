@@ -264,6 +264,11 @@ class v4l2_rect(ctypes.Structure):
         ("height", ctypes.c_int32),
     ]
 
+class v4l2_ext_rect(ctypes.Structure):
+    _fields_ = [
+        ("r", v4l2_rect),
+        ("reserved", ctypes.c_int32 * 4),
+    ]
 
 class v4l2_fract(ctypes.Structure):
     _fields_ = [
@@ -757,6 +762,39 @@ class v4l2_crop(ctypes.Structure):
         ("c", v4l2_rect),
     ]
 
+# Selection interface definitions from 'v4l2-common.h'
+
+# Selection TARGET
+V4L2_SEL_TGT_CROP		= 0x0000
+V4L2_SEL_TGT_CROP_DEFAULT	= 0x0001
+V4L2_SEL_TGT_CROP_BOUNDS	= 0x0002
+V4L2_SEL_TGT_NATIVE_SIZE	= 0x0003
+V4L2_SEL_TGT_COMPOSE		= 0x0100
+V4L2_SEL_TGT_COMPOSE_DEFAULT	= 0x0101
+V4L2_SEL_TGT_COMPOSE_BOUNDS	= 0x0102
+V4L2_SEL_TGT_COMPOSE_PADDED	= 0x0103
+
+# Selection flags
+V4L2_SEL_FLAG_GE		= (1 << 0)
+V4L2_SEL_FLAG_LE		= (1 << 1)
+V4L2_SEL_FLAG_KEEP_CONFIG	= (1 << 2)
+
+class v4l2_selection(ctypes.Structure):
+    class _u(ctypes.Union):
+        _fields_ = [
+            ("reserved", ctypes.c_uint32 * 8),
+            ("pr", ctypes.POINTER(v4l2_ext_rect)),
+        ]
+
+    _anonymous_ = ("u",)
+    _fields_ = [
+        ("type", v4l2_buf_type),
+        ("target", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("r", v4l2_rect),
+        ("rectangles", ctypes.c_uint32),
+        ("u", _u),
+    ]
 
 #
 # Analog video standard
@@ -1998,6 +2036,9 @@ VIDIOC_G_DV_PRESET = _IOWR("V", 85, v4l2_dv_preset)
 VIDIOC_QUERY_DV_PRESET = _IOR("V", 86, v4l2_dv_preset)
 VIDIOC_S_DV_TIMINGS = _IOWR("V", 87, v4l2_dv_timings)
 VIDIOC_G_DV_TIMINGS = _IOWR("V", 88, v4l2_dv_timings)
+
+VIDIOC_G_SELECTION = _IOWR("V", 94, v4l2_selection)
+VIDIOC_S_SELECTION = _IOWR("V", 95, v4l2_selection)
 
 VIDIOC_OVERLAY_OLD = _IOWR("V", 14, ctypes.c_int)
 VIDIOC_S_PARM_OLD = _IOW("V", 22, v4l2_streamparm)
