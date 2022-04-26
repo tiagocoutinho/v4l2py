@@ -14,6 +14,7 @@ import logging
 import pathlib
 import fractions
 import collections
+import copy
 
 from . import raw
 
@@ -282,6 +283,7 @@ class Device:
             self.video_capture = VideoCapture(self)
         else:
             self.video_capture = None
+        self.ctrl_list = self._get_device_controls()
 
     def __enter__(self):
         self._context_level += 1
@@ -313,6 +315,65 @@ class Device:
     @property
     def closed(self):
         return self._fobj.closed
+
+    def _get_device_controls(self):
+        ret = []
+        queryctrl_ext = raw.v4l2_query_ext_ctrl()
+        queryctrl_ext.id = (
+            raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+        )
+
+        while True:
+            try:
+                self._ioctl(IOC.QUERY_EXT_CTRL.value, queryctrl_ext)
+            except OSError as e:
+                assert e.errno == errno.EINVAL
+                break
+            #print(f"name={queryctrl_ext.name}")
+
+            if not (queryctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (queryctrl_ext.type & raw.V4L2_CTRL_TYPE_CTRL_CLASS):
+                ret.append(copy.deepcopy(queryctrl_ext))
+            queryctrl_ext.id |= (raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND)
+
+        return ret
+
+    def ctrls_name(self):
+        ret = []
+        for queryctrl in self.ctrl_list:
+            ret.append(queryctrl.name.decode("UTF-8"))
+        return ret
+
+    def get_ctrl(self, name):
+        for queryctrl in self.ctrl_list:
+            if queryctrl.name.decode("UTF-8").lower() != name.lower():
+                continue
+            control = raw.v4l2_control(queryctrl.id)
+            try:
+            	self._ioctl(IOC.G_CTRL.value, control)
+            except OSError as error:
+            	#print(error.errno)
+            	raise
+            		
+            return control.value
+        raise ValueError("Failed to find control %s" % name)
+
+    def set_ctrl(self, name, value):
+        for queryctrl in self.ctrl_list:
+            if queryctrl.name.decode("UTF-8").lower() != name.lower():
+                continue
+            if value < queryctrl.minimum or value > queryctrl.maximum:
+                raise ValueError(
+                    "Require %d <= %d <= %d"
+                    % (queryctrl.minimum, value, queryctrl.maximum)
+                )
+            control = raw.v4l2_control(queryctrl.id, value)
+            try:
+                self._ioctl(IOC.S_CTRL.value, control)
+            except OSError as error:
+                #print(error.errno)
+                raise
+            return
+        raise ValueError("Failed to find control %s" % name)
 
 
 class VideoCapture:
