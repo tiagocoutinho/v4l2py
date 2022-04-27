@@ -98,9 +98,14 @@ def frame_sizes(fd, pixel_formats):
     return sizes
 
 
-def read_info(fd):
+def read_capabilities(fd):
     caps = raw.v4l2_capability()
     fcntl.ioctl(fd, IOC.QUERYCAP.value, caps)
+    return caps
+
+
+def read_info(fd):
+    caps = read_capabilities(fd)
     version_tuple = (
         (caps.version & 0xFF0000) >> 16,
         (caps.version & 0x00FF00) >> 8,
@@ -169,12 +174,20 @@ def read_info(fd):
     )
 
 
+def fopen(path, rw=False):
+    return open(path, "rb+" if rw else "rb" , buffering=0, opener=opener)
+
+
+def opener(path, flags):
+    return os.open(path, flags | os.O_NONBLOCK)
+
+
 class Device:
 
     def __init__(self, filename):
         self._context_level = 0
-        self._fd = os.open(filename, os.O_RDWR | os.O_NONBLOCK)
-        self.info = read_info(self._fd)
+        self._fobj = fopen(filename, rw=True)
+        self.info = read_info(self.fileno())
         self.filename = filename
         if Capability.VIDEO_CAPTURE in self.info.capabilities:
             self.video_capture = VideoCapture(self)
@@ -201,16 +214,16 @@ class Device:
         return Device("/dev/video{}".format(did))
 
     def close(self):
-        if self._fd is not None:
-            os.close(self._fd)
-            self._fd = None
+        if self._fobj is not None:
+            self._fobj.close()
+            self._fobj = None
 
     def fileno(self):
-        return self._fd
+        return self._fobj.fileno()
 
     @property
     def closed(self):
-        return self._fd is None
+        return self._fobj is None
 
 
 class VideoCapture:
@@ -472,5 +485,9 @@ def iter_devices(path="/dev"):
 
 
 def iter_video_capture_devices(path="/dev"):
-    f = lambda d: Capability.VIDEO_CAPTURE in d.info.capabilities
-    return filter(f, iter_devices(path))
+    def filt(filename):
+        with fopen(filename) as fobj:
+            caps = read_capabilities(fobj.fileno())
+            return Capability.VIDEO_CAPTURE in Capability(caps.device_caps)
+
+    return (Device(name) for name in filter(filt, iter_video_files(path)))
