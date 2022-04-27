@@ -138,7 +138,10 @@ def read_info(fd):
                     break
                 else:
                     raise
-            pixel_format = PixelFormat(fmt.pixelformat)
+            try:
+                pixel_format = PixelFormat(fmt.pixelformat)
+            except ValueError:
+                break
             formats.append(ImageFormat(
                 type=stream_type,
                 flags=ImageFormatFlag(fmt.flags),
