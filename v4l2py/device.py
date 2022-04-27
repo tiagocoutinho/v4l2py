@@ -141,7 +141,7 @@ def read_info(fd):
             try:
                 pixel_format = PixelFormat(fmt.pixelformat)
             except ValueError:
-                break
+                continue
             formats.append(ImageFormat(
                 type=stream_type,
                 flags=ImageFormatFlag(fmt.flags),
