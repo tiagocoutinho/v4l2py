@@ -475,7 +475,7 @@ class v4l2_frmsize_discrete(ctypes.Structure):
 class v4l2_frmsize_stepwise(ctypes.Structure):
     _fields_ = [
         ("min_width", ctypes.c_uint32),
-        ("min_height", ctypes.c_uint32),
+        ("max_width", ctypes.c_uint32),
         ("step_width", ctypes.c_uint32),
         ("min_height", ctypes.c_uint32),
         ("max_height", ctypes.c_uint32),
