@@ -11,6 +11,7 @@ import errno
 import fcntl
 import select
 import pathlib
+import fractions
 import collections
 
 from . import raw
@@ -85,11 +86,11 @@ def frame_sizes(fd, pixel_formats):
             val.index = index
             # values come in frame interval (fps = 1/interval)
             if val.type == FrameIntervalType.DISCRETE:
-                min_fps = max_fps = step_fps = val.discrete.denominator / val.discrete.numerator
+                min_fps = max_fps = step_fps = fractions.Fraction(val.discrete.denominator / val.discrete.numerator)
             else:
-                min_fps = val.stepwise.min.denominator / val.stepwise.min.numerator
-                max_fps = val.stepwise.max.denominator / val.stepwise.max.numerator
-                step_fps = val.stepwise.step.denominator / val.stepwise.step.numerator
+                min_fps = fractions.Fraction(val.stepwise.min.denominator, val.stepwise.min.numerator)
+                max_fps = fractions.Fraction(val.stepwise.max.denominator, val.stepwise.max.numerator)
+                step_fps = fractions.Fraction(val.stepwise.step.denominator, val.stepwise.step.numerator)
             res.append(FrameType(
                 type=FrameIntervalType(val.type),
                 pixel_format=fmt, width=w, height=h,
@@ -291,8 +292,9 @@ class VideoCapture:
     def set_fps(self, fps):
         p = raw.v4l2_streamparm()
         p.type = self.buffer_type
-        p.parm.capture.timeperframe.numerator = 1
-        p.parm.capture.timeperframe.denominator = fps
+        fps = fractions.Fraction(fps)
+        p.parm.capture.timeperframe.numerator = fps.denominator
+        p.parm.capture.timeperframe.denominator = fps.numerator
         return self._ioctl(IOC.S_PARM, p)
 
     def get_fps(self):
