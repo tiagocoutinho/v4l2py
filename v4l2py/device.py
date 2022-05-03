@@ -159,7 +159,7 @@ def read_info(fd):
             formats.append(ImageFormat(
                 type=stream_type,
                 flags=ImageFormatFlag(fmt.flags),
-                description=fmt.description,
+                description=fmt.description.decode(),
                 pixel_format=pixel_format))
             pixel_formats.add(pixel_format)
 
