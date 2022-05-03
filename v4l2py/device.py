@@ -10,11 +10,15 @@ import mmap
 import errno
 import fcntl
 import select
+import logging
 import pathlib
 import fractions
 import collections
 
 from . import raw
+
+
+log = logging.getLogger(__name__)
 
 
 def _enum(name, prefix, klass=enum.IntEnum):
@@ -258,6 +262,8 @@ def opener(path, flags):
 
 class Device:
     def __init__(self, filename):
+        filename = pathlib.Path(filename)
+        self._log = log.getChild(filename.stem)
         self._context_level = 0
         self._fobj = fopen(filename, rw=True)
         self.info = read_info(self.fileno())
@@ -288,6 +294,7 @@ class Device:
 
     def close(self):
         if self._fobj is not None:
+            self._log.info("closing")
             self._fobj.close()
             self._fobj = None
 
