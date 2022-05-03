@@ -72,13 +72,23 @@ driver = {info.driver}
 card = {info.card}
 bus = {info.bus_info}
 version = {info.version}
-physical capabilities = {info.physical_capabilities!r}
-capabilities = {info.capabilities!r}
+physical capabilities = {physical_capabilities}
+capabilities = {capabilities}
+buffers = {buffers}
 """
 
 
+def flag_items(flag):
+    return [item for item in type(flag) if item in flag]
+
+
 def Info_repr(info):
-    return INFO_REPR.format(info=info)
+    caps = "|".join(cap.name for cap in flag_items(info.capabilities))
+    pcaps = "|".join(cap.name for cap in flag_items(info.physical_capabilities))
+    buffers = "|".join(buff.name for buff in info.buffers)
+    return INFO_REPR.format(
+        info=info, capabilities=caps, physical_capabilities=pcaps, buffers=buffers
+    )
 
 
 Info.__repr__ = Info_repr
