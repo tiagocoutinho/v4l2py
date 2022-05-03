@@ -303,17 +303,16 @@ class Device:
         return Device("/dev/video{}".format(did))
 
     def close(self):
-        if self._fobj is not None:
+        if not self.closed:
             self._log.info("closing")
             self._fobj.close()
-            self._fobj = None
 
     def fileno(self):
         return self._fobj.fileno()
 
     @property
     def closed(self):
-        return self._fobj is None
+        return self._fobj.closed
 
 
 class VideoCapture:
