@@ -52,6 +52,20 @@ FrameType = collections.namedtuple(
     "FrameType", "type pixel_format width height min_fps max_fps step_fps")
 
 
+INFO_REPR = """\
+driver = {info.driver}
+card = {info.card}
+bus = {info.bus_info}
+version = {info.version}
+physical capabilities = {info.physical_capabilities!r}
+capabilities = {info.capabilities!r}
+"""
+
+def Info_repr(info):
+    return INFO_REPR.format(info=info)
+Info.__repr__ = Info_repr
+
+
 def frame_sizes(fd, pixel_formats):
 
     def get_frame_intervals(fmt, w, h):
