@@ -307,9 +307,11 @@ class Device:
 
 
 class VideoCapture:
-    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE):
+
+    buffer_type = BufferType.VIDEO_CAPTURE
+
+    def __init__(self, device):
         self.device = device
-        self.buffer_type = buffer_type
 
     def __iter__(self):
         return iter(VideoStream(self))
