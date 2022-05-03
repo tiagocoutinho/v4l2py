@@ -97,23 +97,36 @@ def frame_sizes(fd, pixel_formats):
                     raise
             val.index = index
             # values come in frame interval (fps = 1/interval)
-            if val.type == FrameIntervalType.DISCRETE:
+            try:
+                ftype = FrameIntervalType(val.type)
+            except ValueError:
+                break
+            if ftype == FrameIntervalType.DISCRETE:
                 min_fps = max_fps = step_fps = fractions.Fraction(
                     val.discrete.denominator / val.discrete.numerator
                 )
             else:
-                min_fps = fractions.Fraction(
-                    val.stepwise.min.denominator, val.stepwise.min.numerator
-                )
-                max_fps = fractions.Fraction(
-                    val.stepwise.max.denominator, val.stepwise.max.numerator
-                )
-                step_fps = fractions.Fraction(
-                    val.stepwise.step.denominator, val.stepwise.step.numerator
-                )
+                if val.stepwise.min.numerator == 0:
+                    min_fps = 0
+                else:
+                    min_fps = fractions.Fraction(
+                        val.stepwise.min.denominator, val.stepwise.min.numerator
+                    )
+                if val.stepwise.max.numerator == 0:
+                    max_fps = 0
+                else:
+                    max_fps = fractions.Fraction(
+                        val.stepwise.max.denominator, val.stepwise.max.numerator
+                    )
+                if val.stepwise.step.numerator == 0:
+                    step_fps = 0
+                else:
+                    step_fps = fractions.Fraction(
+                        val.stepwise.step.denominator, val.stepwise.step.numerator
+                    )
             res.append(
                 FrameType(
-                    type=FrameIntervalType(val.type),
+                    type=ftype,
                     pixel_format=fmt,
                     width=w,
                     height=h,
@@ -133,11 +146,6 @@ def frame_sizes(fd, pixel_formats):
             sizes += get_frame_intervals(
                 pixel_format, size.discrete.width, size.discrete.height
             )
-        else:
-            step = size.stepwise
-            for w in range(step.min_width, step.max_width, step.step_width):
-                for h in range(step.min_height, step.max_height, step.step_height):
-                    sizes += get_frame_intervals(pixel_format, w, h)
     return sizes
 
 
@@ -203,7 +211,10 @@ def read_info(fd):
     crop_caps = []
     for stream_type in crop_stream_types:
         crop.type = stream_type
-        fcntl.ioctl(fd, IOC.CROPCAP.value, crop)
+        try:
+            fcntl.ioctl(fd, IOC.CROPCAP.value, crop)
+        except OSError:
+            continue
         crop_caps.append(
             CropCapability(
                 type=stream_type,
