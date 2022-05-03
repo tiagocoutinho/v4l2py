@@ -18,9 +18,14 @@ from . import raw
 
 
 def _enum(name, prefix, klass=enum.IntEnum):
-    return klass(name,
-        ((name.replace(prefix, ""), getattr(raw, name))
-        for name in dir(raw) if name.startswith(prefix)))
+    return klass(
+        name,
+        (
+            (name.replace(prefix, ""), getattr(raw, name))
+            for name in dir(raw)
+            if name.startswith(prefix)
+        ),
+    )
 
 
 Capability = _enum("Capability", "V4L2_CAP_", klass=enum.IntFlag)
@@ -35,22 +40,27 @@ IOC = _enum("IOC", "VIDIOC_", klass=enum.Enum)
 
 
 Info = collections.namedtuple(
-    "Info", "driver card bus_info version physical_capabilities capabilities crop_capabilities buffers formats frame_sizes")
+    "Info",
+    "driver card bus_info version physical_capabilities capabilities crop_capabilities buffers formats frame_sizes",
+)
 
 ImageFormat = collections.namedtuple(
-    "ImageFormat", "type description flags pixel_format")
+    "ImageFormat", "type description flags pixel_format"
+)
 
 Format = collections.namedtuple("Format", "width height pixel_format")
 
 CropCapability = collections.namedtuple(
-    "CropCapability", "type bounds defrect pixel_aspect")
+    "CropCapability", "type bounds defrect pixel_aspect"
+)
 
 Rect = collections.namedtuple("Rect", "left top width height")
 
 Size = collections.namedtuple("Size", "width height")
 
 FrameType = collections.namedtuple(
-    "FrameType", "type pixel_format width height min_fps max_fps step_fps")
+    "FrameType", "type pixel_format width height min_fps max_fps step_fps"
+)
 
 
 INFO_REPR = """\
@@ -62,13 +72,15 @@ physical capabilities = {info.physical_capabilities!r}
 capabilities = {info.capabilities!r}
 """
 
+
 def Info_repr(info):
     return INFO_REPR.format(info=info)
+
+
 Info.__repr__ = Info_repr
 
 
 def frame_sizes(fd, pixel_formats):
-
     def get_frame_intervals(fmt, w, h):
         val = raw.v4l2_frmivalenum()
         val.pixel_format = fmt
@@ -86,15 +98,30 @@ def frame_sizes(fd, pixel_formats):
             val.index = index
             # values come in frame interval (fps = 1/interval)
             if val.type == FrameIntervalType.DISCRETE:
-                min_fps = max_fps = step_fps = fractions.Fraction(val.discrete.denominator / val.discrete.numerator)
+                min_fps = max_fps = step_fps = fractions.Fraction(
+                    val.discrete.denominator / val.discrete.numerator
+                )
             else:
-                min_fps = fractions.Fraction(val.stepwise.min.denominator, val.stepwise.min.numerator)
-                max_fps = fractions.Fraction(val.stepwise.max.denominator, val.stepwise.max.numerator)
-                step_fps = fractions.Fraction(val.stepwise.step.denominator, val.stepwise.step.numerator)
-            res.append(FrameType(
-                type=FrameIntervalType(val.type),
-                pixel_format=fmt, width=w, height=h,
-                min_fps=min_fps, max_fps=max_fps, step_fps=step_fps))
+                min_fps = fractions.Fraction(
+                    val.stepwise.min.denominator, val.stepwise.min.numerator
+                )
+                max_fps = fractions.Fraction(
+                    val.stepwise.max.denominator, val.stepwise.max.numerator
+                )
+                step_fps = fractions.Fraction(
+                    val.stepwise.step.denominator, val.stepwise.step.numerator
+                )
+            res.append(
+                FrameType(
+                    type=FrameIntervalType(val.type),
+                    pixel_format=fmt,
+                    width=w,
+                    height=h,
+                    min_fps=min_fps,
+                    max_fps=max_fps,
+                    step_fps=step_fps,
+                )
+            )
         return res
 
     size = raw.v4l2_frmsizeenum()
@@ -103,8 +130,9 @@ def frame_sizes(fd, pixel_formats):
         size.pixel_format = pixel_format
         fcntl.ioctl(fd, IOC.ENUM_FRAMESIZES.value, size)
         if size.type == FrameSizeType.DISCRETE:
-            sizes += get_frame_intervals(pixel_format, size.discrete.width,
-                                         size.discrete.height)
+            sizes += get_frame_intervals(
+                pixel_format, size.discrete.width, size.discrete.height
+            )
         else:
             step = size.stepwise
             for w in range(step.min_width, step.max_width, step.step_width):
@@ -127,17 +155,16 @@ def read_info(fd):
         (caps.version & 0x0000FF),
     )
     version_str = ".".join(map(str, version_tuple))
-    device_capabilities=Capability(caps.device_caps)
-    buffers = [
-        typ for typ in BufferType
-        if Capability[typ.name] in device_capabilities
-    ]
+    device_capabilities = Capability(caps.device_caps)
+    buffers = [typ for typ in BufferType if Capability[typ.name] in device_capabilities]
 
     fmt = raw.v4l2_fmtdesc()
     img_fmt_stream_types = {
-        BufferType.VIDEO_CAPTURE, BufferType.VIDEO_CAPTURE_MPLANE,
-        BufferType.VIDEO_OUTPUT, BufferType.VIDEO_OUTPUT_MPLANE,
-        BufferType.VIDEO_OVERLAY
+        BufferType.VIDEO_CAPTURE,
+        BufferType.VIDEO_CAPTURE_MPLANE,
+        BufferType.VIDEO_OUTPUT,
+        BufferType.VIDEO_OUTPUT_MPLANE,
+        BufferType.VIDEO_OVERLAY,
     } & set(buffers)
 
     formats = []
@@ -157,26 +184,44 @@ def read_info(fd):
                 pixel_format = PixelFormat(fmt.pixelformat)
             except ValueError:
                 continue
-            formats.append(ImageFormat(
-                type=stream_type,
-                flags=ImageFormatFlag(fmt.flags),
-                description=fmt.description.decode(),
-                pixel_format=pixel_format))
+            formats.append(
+                ImageFormat(
+                    type=stream_type,
+                    flags=ImageFormatFlag(fmt.flags),
+                    description=fmt.description.decode(),
+                    pixel_format=pixel_format,
+                )
+            )
             pixel_formats.add(pixel_format)
 
     crop = raw.v4l2_cropcap()
     crop_stream_types = {
-        BufferType.VIDEO_CAPTURE, BufferType.VIDEO_OUTPUT, BufferType.VIDEO_OVERLAY
+        BufferType.VIDEO_CAPTURE,
+        BufferType.VIDEO_OUTPUT,
+        BufferType.VIDEO_OVERLAY,
     } & set(buffers)
     crop_caps = []
     for stream_type in crop_stream_types:
         crop.type = stream_type
         fcntl.ioctl(fd, IOC.CROPCAP.value, crop)
-        crop_caps.append(CropCapability(
-            type=stream_type,
-            bounds=Rect(crop.bounds.left, crop.bounds.top, crop.bounds.width, crop.bounds.height),
-            defrect=Rect(crop.defrect.left, crop.defrect.top, crop.defrect.width, crop.defrect.height),
-            pixel_aspect=crop.pixelaspect.numerator/crop.pixelaspect.denominator))
+        crop_caps.append(
+            CropCapability(
+                type=stream_type,
+                bounds=Rect(
+                    crop.bounds.left,
+                    crop.bounds.top,
+                    crop.bounds.width,
+                    crop.bounds.height,
+                ),
+                defrect=Rect(
+                    crop.defrect.left,
+                    crop.defrect.top,
+                    crop.defrect.width,
+                    crop.defrect.height,
+                ),
+                pixel_aspect=crop.pixelaspect.numerator / crop.pixelaspect.denominator,
+            )
+        )
 
     return Info(
         driver=caps.driver.decode(),
@@ -193,7 +238,7 @@ def read_info(fd):
 
 
 def fopen(path, rw=False):
-    return open(path, "rb+" if rw else "rb" , buffering=0, opener=opener)
+    return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
 
 
 def opener(path, flags):
@@ -201,7 +246,6 @@ def opener(path, flags):
 
 
 class Device:
-
     def __init__(self, filename):
         self._context_level = 0
         self._fobj = fopen(filename, rw=True)
@@ -245,7 +289,6 @@ class Device:
 
 
 class VideoCapture:
-
     def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE):
         self.device = device
         self.buffer_type = buffer_type
@@ -263,7 +306,8 @@ class VideoCapture:
     @property
     def crop_capabilities(self):
         return [
-            crop for crop in self.device.info.crop_capabilities
+            crop
+            for crop in self.device.info.crop_capabilities
             if crop.type == self.buffer_type
         ]
 
@@ -286,7 +330,7 @@ class VideoCapture:
         return Format(
             width=f.fmt.pix.width,
             height=f.fmt.pix.height,
-            pixel_format=PixelFormat(f.fmt.pix.pixelformat)
+            pixel_format=PixelFormat(f.fmt.pix.pixelformat),
         )
 
     def set_fps(self, fps):
@@ -314,8 +358,9 @@ class VideoCapture:
 
 
 class BaseBuffer:
-
-    def __init__(self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True):
+    def __init__(
+        self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True
+    ):
         self._context_level = 0
         self.device = device
         self.index = index
@@ -345,7 +390,6 @@ class BaseBuffer:
 
 
 class BufferMMAP(BaseBuffer):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         buff = self._v4l2_buffer()
@@ -366,7 +410,7 @@ class BufferMMAP(BaseBuffer):
             self.mmap = None
 
     def raw_read(self, buff):
-        result = self.mmap[:buff.bytesused]
+        result = self.mmap[: buff.bytesused]
         if self.queue:
             self._ioctl(IOC.QBUF, buff)
         return result
@@ -377,9 +421,14 @@ class BufferMMAP(BaseBuffer):
 
 
 class Buffers:
-
-    def __init__(self, device, buffer_type=BufferType.VIDEO_CAPTURE,
-                 buffer_size=1, buffer_queue=True, memory=Memory.MMAP):
+    def __init__(
+        self,
+        device,
+        buffer_type=BufferType.VIDEO_CAPTURE,
+        buffer_size=1,
+        buffer_queue=True,
+        memory=Memory.MMAP,
+    ):
         self._context_level = 0
         self.device = device
         self.buffer_size = buffer_size
@@ -432,14 +481,18 @@ class Buffers:
 
 
 class VideoStream:
-
-    def __init__(self, video_capture, buffer_size=1, buffer_queue=True,
-                 memory=Memory.MMAP):
+    def __init__(
+        self, video_capture, buffer_size=1, buffer_queue=True, memory=Memory.MMAP
+    ):
         self._context_level = 0
         self.video_capture = video_capture
         self.buffers = Buffers(
-            video_capture.device, video_capture.buffer_type,
-            buffer_size, buffer_queue, memory)
+            video_capture.device,
+            video_capture.buffer_type,
+            buffer_size,
+            buffer_queue,
+            memory,
+        )
 
     def __enter__(self):
         self._context_level += 1
@@ -478,6 +531,7 @@ def Stream(stream):
 
 async def AsyncStream(stream):
     import asyncio
+
     cap = stream.video_capture
     fd = cap.device.fileno()
     loop = asyncio.get_event_loop()
