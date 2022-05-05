@@ -365,16 +365,29 @@ class VideoCapture:
     def set_fps(self, fps):
         p = raw.v4l2_streamparm()
         p.type = self.buffer_type
-        fps = fractions.Fraction(fps)
+        max_den = int(min(2**32, 2**32/fps)) #v4l2 fraction is u32
+        fps = fractions.Fraction(fps).limit_denominator(max_den)
         p.parm.capture.timeperframe.numerator = fps.denominator
         p.parm.capture.timeperframe.denominator = fps.numerator
-        return self._ioctl(IOC.S_PARM, p)
+        #print(fps)
+        try:
+            return self._ioctl(IOC.S_PARM, p)
+        except OSError as error:
+            #print(error.errno)
+            raise
 
     def get_fps(self):
         p = raw.v4l2_streamparm()
         p.type = self.buffer_type
-        self._ioctl(IOC.G_PARM, p)
-        return p.parm.capture.timeperframe.denominator
+        try:
+            self._ioctl(IOC.G_PARM, p)
+        except OSError as error:
+            #print(error.errno)
+            raise
+        return (
+            p.parm.capture.timeperframe.denominator
+            / p.parm.capture.timeperframe.numerator
+        )
 
     def start(self):
         btype = raw.v4l2_buf_type(self.buffer_type)
