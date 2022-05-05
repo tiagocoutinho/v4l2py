@@ -11,11 +11,15 @@ from v4l2py import Device
 
 app = flask.Flask('basic-web-cam')
 
+
+PREFIX = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+SUFFIX = b"\r\n"
+
 def gen_frames():
     with Device.from_id(0) as cam:
         cam.video_capture.set_format(640, 480, 'MJPG')
         for frame in cam:
-            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+            yield b"".join((PREFIX, frame, SUFFIX))
 
 @app.route("/")
 def index():
