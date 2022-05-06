@@ -282,6 +282,10 @@ class Device:
             self.video_capture = VideoCapture(self)
         else:
             self.video_capture = None
+        if Capability.VIDEO_OUTPUT in self.info.capabilities:
+            self.video_output = VideoWriter(self)
+        else:
+            self.video_output = None
 
     def __enter__(self):
         self._context_level += 1
@@ -314,6 +318,70 @@ class Device:
     def closed(self):
         return self._fobj.closed
 
+class VideoWriter:
+
+    buffer_type = BufferType.VIDEO_OUTPUT
+
+    def __init__(self, device):
+        self.device = device
+
+    def _ioctl(self, request, arg=0):
+        return self.device._ioctl(request.value, arg=arg)
+
+    @property
+    def formats(self):
+        return [fmt for fmt in self.device.info.formats if fmt.type == self.buffer_type]
+
+    @property
+    def crop_capabilities(self):
+        return [
+            crop
+            for crop in self.device.info.crop_capabilities
+            if crop.type == self.buffer_type
+        ]
+
+    def set_format(self, width, height, pixel_format="YUYV"):
+        f = raw.v4l2_format()
+        if isinstance(pixel_format, str):
+            pixel_format = raw.v4l2_fourcc(*pixel_format.upper())
+        f.type = self.buffer_type
+        f.fmt.pix.pixelformat = pixel_format
+        f.fmt.pix.field = Field.ANY
+        f.fmt.pix.width = width
+        f.fmt.pix.height = height
+        f.fmt.pix.bytesperline = 0
+        return self._ioctl(IOC.S_FMT, f)
+
+    def get_format(self):
+        f = raw.v4l2_format()
+        f.type = self.buffer_type
+        self._ioctl(IOC.G_FMT, f)
+        return Format(
+            width=f.fmt.pix.width,
+            height=f.fmt.pix.height,
+            pixel_format=PixelFormat(f.fmt.pix.pixelformat),
+        )
+
+    def set_fps(self, fps):
+        p = raw.v4l2_streamparm()
+        p.type = self.buffer_type
+        fps = fractions.Fraction(fps)
+        p.parm.capture.timeperframe.numerator = fps.denominator
+        p.parm.capture.timeperframe.denominator = fps.numerator
+        return self._ioctl(IOC.S_PARM, p)
+
+    def get_fps(self):
+        p = raw.v4l2_streamparm()
+        p.type = self.buffer_type
+        self._ioctl(IOC.G_PARM, p)
+        return p.parm.capture.timeperframe.denominator
+
+    def write(self, b):
+        self.device._fobj.write(b)
+
+    def sink(self, iterable):
+        for b in iterable:
+            self.device._fobj.write(b)
 
 class VideoCapture:
 
