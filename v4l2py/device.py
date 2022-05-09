@@ -14,6 +14,7 @@ import logging
 import pathlib
 import fractions
 import collections
+import ctypes
 
 from . import raw
 
@@ -318,6 +319,8 @@ class Device:
 class VideoCapture:
 
     buffer_type = BufferType.VIDEO_CAPTURE
+    
+    MAX_NR_CROP_RECTS = 8
 
     def __init__(self, device):
         self.device = device
@@ -375,6 +378,54 @@ class VideoCapture:
         p.type = self.buffer_type
         self._ioctl(IOC.G_PARM, p)
         return p.parm.capture.timeperframe.denominator
+        
+    def get_selection(self):
+        selection = raw.v4l2_selection()
+        selection.type = self.buffer_type
+        selection.rectangles = VideoCapture.MAX_NR_CROP_RECTS
+        rects = (raw.v4l2_ext_rect * selection.rectangles)()
+        selection.pr = ctypes.cast(ctypes.pointer(rects), ctypes.POINTER(raw.v4l2_ext_rect))
+        try:
+            self._ioctl(IOC.G_SELECTION, selection)
+        except OSError as error:
+            #print(error.errno)
+            raise
+        if selection.rectangles == 0:
+            return Rect(
+                left=selection.r.left, top=selection.r.top, width=selection.r.width, height=selection.r.height
+            )
+        else:
+            res = []
+            for i in range(0, selection.rectangles):
+                r = Rect(
+                    left=rects[i].r.left, top=rects[i].r.top, width=rects[i].r.width, height=rects[i].r.height
+                )
+                res.append(r)
+            return res
+            
+    def set_selection(self, rect_array):
+        nr_rects = len(rect_array)
+        if nr_rects > VideoCapture.MAX_NR_CROP_RECTS:
+            raise ValueError(f"Too many selection areas: {nr_rects}, max supported: {VideoCapture.MAX_NR_CROP_RECTS}")
+            
+        selection = raw.v4l2_selection()
+        selection.type = self.buffer_type
+        selection.target = raw.V4L2_SEL_TGT_CROP
+        selection.rectangles = nr_rects
+        rects = (raw.v4l2_ext_rect * selection.rectangles)()
+        
+        for i in range(0, nr_rects):
+            rects[i].r.left = rect_array[i].left
+            rects[i].r.top = rect_array[i].top
+            rects[i].r.width = rect_array[i].width
+            rects[i].r.height = rect_array[i].height
+            
+        selection.pr = ctypes.cast(ctypes.pointer(rects), ctypes.POINTER(raw.v4l2_ext_rect))
+        try:
+            self._ioctl(IOC.S_SELECTION, selection)
+        except OSError as error:
+            #print(error.errno)
+            raise
 
     def start(self):
         btype = raw.v4l2_buf_type(self.buffer_type)
