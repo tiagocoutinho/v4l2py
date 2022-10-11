@@ -498,6 +498,11 @@ class Buffers:
             for buff in self.buffers:
                 buff.close()
             self.buffers = None
+        r = raw.v4l2_requestbuffers()
+        r.count = 0
+        r.type = self.buffer_type
+        r.memory = self.memory
+        self._ioctl(IOC.REQBUFS, r)
 
     def raw_read(self):
         buff = self.buffers[0]._v4l2_buffer()
