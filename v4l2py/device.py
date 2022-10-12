@@ -102,6 +102,7 @@ def frame_sizes(fd, pixel_formats):
         val.height = h
         res = []
         for index in range(128):
+            val.index = index
             try:
                 fcntl.ioctl(fd, IOC.ENUM_FRAMEINTERVALS.value, val)
             except OSError as error:
@@ -109,7 +110,6 @@ def frame_sizes(fd, pixel_formats):
                     break
                 else:
                     raise
-            val.index = index
             # values come in frame interval (fps = 1/interval)
             try:
                 ftype = FrameIntervalType(val.type)
@@ -155,11 +155,19 @@ def frame_sizes(fd, pixel_formats):
     sizes = []
     for pixel_format in pixel_formats:
         size.pixel_format = pixel_format
-        fcntl.ioctl(fd, IOC.ENUM_FRAMESIZES.value, size)
-        if size.type == FrameSizeType.DISCRETE:
-            sizes += get_frame_intervals(
-                pixel_format, size.discrete.width, size.discrete.height
-            )
+        size.index = 0
+        while True:
+            try:
+                fcntl.ioctl(fd, IOC.ENUM_FRAMESIZES.value, size)
+            except OSError:
+                break
+            if size.type == FrameSizeType.DISCRETE:
+                sizes += get_frame_intervals(
+                    pixel_format,
+                    size.discrete.width,
+                    size.discrete.height
+                )
+            size.index += 1
     return sizes
 
 
