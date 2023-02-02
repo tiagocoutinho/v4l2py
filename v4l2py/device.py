@@ -104,6 +104,28 @@ def Info_repr(info):
 Info.__repr__ = Info_repr
 
 
+def raw_crop_caps_to_crop_caps(stream_type, crop):
+    return CropCapability(
+        type=stream_type,
+        bounds=Rect(
+            crop.bounds.left,
+            crop.bounds.top,
+            crop.bounds.width,
+            crop.bounds.height,
+        ),
+        defrect=Rect(
+            crop.defrect.left,
+            crop.defrect.top,
+            crop.defrect.width,
+            crop.defrect.height,
+        ),
+        pixel_aspect=crop.pixelaspect.numerator / crop.pixelaspect.denominator,
+    )
+
+
+CropCapability.from_raw = raw_crop_caps_to_crop_caps
+
+
 def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
     for index in range(start, stop, step):
         indexed_struct.index = index
@@ -250,24 +272,8 @@ def read_info(fd):
             fcntl.ioctl(fd, IOC.CROPCAP.value, crop)
         except OSError:
             continue
-        crop_caps.append(
-            CropCapability(
-                type=stream_type,
-                bounds=Rect(
-                    crop.bounds.left,
-                    crop.bounds.top,
-                    crop.bounds.width,
-                    crop.bounds.height,
-                ),
-                defrect=Rect(
-                    crop.defrect.left,
-                    crop.defrect.top,
-                    crop.defrect.width,
-                    crop.defrect.height,
-                ),
-                pixel_aspect=crop.pixelaspect.numerator / crop.pixelaspect.denominator,
-            )
-        )
+        crop_cap = CropCapability.from_raw(stream_type, crop)
+        crop_caps.append(crop_cap)
 
     return Info(
         driver=caps.driver.decode(),
