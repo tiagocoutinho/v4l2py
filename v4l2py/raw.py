@@ -6,7 +6,6 @@
 
 import ctypes
 
-
 _IOC_NRBITS = 8
 _IOC_TYPEBITS = 8
 _IOC_SIZEBITS = 14
@@ -410,8 +409,21 @@ V4L2_PIX_FMT_MJPEG = v4l2_fourcc("M", "J", "P", "G")
 V4L2_PIX_FMT_JPEG = v4l2_fourcc("J", "P", "E", "G")
 V4L2_PIX_FMT_DV = v4l2_fourcc("d", "v", "s", "d")
 V4L2_PIX_FMT_MPEG = v4l2_fourcc("M", "P", "E", "G")
+V4L2_PIX_FMT_MPG1 = v4l2_fourcc("M", "P", "G", "1")
+V4L2_PIX_FMT_MPG2 = v4l2_fourcc("M", "P", "G", "2")
+V4L2_PIX_FMT_MPEG2_SLICE = v4l2_fourcc("M", "G", "2", "S")
+V4L2_PIX_FMT_MPG4 = v4l2_fourcc("M", "P", "G", "4")
+V4L2_PIX_FMT_H263 = v4l2_fourcc("H", "2", "6", "3")
 V4L2_PIX_FMT_H264 = v4l2_fourcc("H", "2", "6", "4")
+V4L2_PIX_FMT_H264_NO_SC = v4l2_fourcc("A", "V", "C", "1")
+V4L2_PIX_FMT_H264_MVC = v4l2_fourcc("M", "2", "6", "4")
 V4L2_PIX_FMT_H265 = v4l2_fourcc("H", "2", "6", "5")
+V4L2_PIX_FMT_XVID = v4l2_fourcc("X", "V", "I", "D")
+V4L2_PIX_FMT_VC1_ANNEX_G = v4l2_fourcc("V", "C", "1", "G")
+V4L2_PIX_FMT_VC1_ANNEX_L = v4l2_fourcc("V", "C", "1", "L")
+V4L2_PIX_FMT_VP8 = v4l2_fourcc("V", "P", "8", "0")
+V4L2_PIX_FMT_HEVC = v4l2_fourcc("H", "E", "V", "C")
+V4L2_PIX_FMT_FWHT = v4l2_fourcc("F", "W", "H", "T")
 
 # Vendor-specific formats
 V4L2_PIX_FMT_CPIA1 = v4l2_fourcc("C", "P", "I", "A")
