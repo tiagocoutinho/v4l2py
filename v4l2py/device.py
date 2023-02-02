@@ -4,21 +4,24 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-import os
+import collections
 import enum
-import mmap
 import errno
 import fcntl
-import select
-import logging
-import pathlib
 import fractions
-import collections
+import logging
+import mmap
+import os
+import pathlib
+import select
 
 from . import raw
 
-
 log = logging.getLogger(__name__)
+
+
+class V4L2Error(Exception):
+    pass
 
 
 def _enum(name, prefix, klass=enum.IntEnum):
@@ -43,9 +46,16 @@ FrameIntervalType = _enum("FrameIntervalType", "V4L2_FRMIVAL_TYPE_")
 IOC = _enum("IOC", "VIDIOC_", klass=enum.Enum)
 
 
+def human_pixel_format(ifmt):
+    return "".join(map(chr, ((ifmt >> i) & 0xFF for i in range(0, 4 * 8, 8))))
+
+
+PixelFormat.human_str = lambda self: human_pixel_format(self.value)
+
+
 Info = collections.namedtuple(
     "Info",
-    "driver card bus_info version physical_capabilities capabilities crop_capabilities buffers formats frame_sizes",
+    "driver card bus_info version capabilities device_capabilities crop_capabilities buffers formats frame_sizes",
 )
 
 ImageFormat = collections.namedtuple(
@@ -72,8 +82,8 @@ driver = {info.driver}
 card = {info.card}
 bus = {info.bus_info}
 version = {info.version}
-physical capabilities = {physical_capabilities}
 capabilities = {capabilities}
+device_capabilities = {device_capabilities}
 buffers = {buffers}
 """
 
@@ -83,15 +93,28 @@ def flag_items(flag):
 
 
 def Info_repr(info):
+    dcaps = "|".join(cap.name for cap in flag_items(info.device_capabilities))
     caps = "|".join(cap.name for cap in flag_items(info.capabilities))
-    pcaps = "|".join(cap.name for cap in flag_items(info.physical_capabilities))
     buffers = "|".join(buff.name for buff in info.buffers)
     return INFO_REPR.format(
-        info=info, capabilities=caps, physical_capabilities=pcaps, buffers=buffers
+        info=info, capabilities=caps, device_capabilities=dcaps, buffers=buffers
     )
 
 
 Info.__repr__ = Info_repr
+
+
+def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
+    for index in range(start, stop, step):
+        indexed_struct.index = index
+        try:
+            fcntl.ioctl(fd, ioc.value, indexed_struct)
+            yield indexed_struct
+        except OSError as error:
+            if error.errno == errno.EINVAL:
+                break
+            else:
+                raise
 
 
 def frame_sizes(fd, pixel_formats):
@@ -101,15 +124,7 @@ def frame_sizes(fd, pixel_formats):
         val.width = w
         val.height = h
         res = []
-        for index in range(128):
-            val.index = index
-            try:
-                fcntl.ioctl(fd, IOC.ENUM_FRAMEINTERVALS.value, val)
-            except OSError as error:
-                if error.errno == errno.EINVAL:
-                    break
-                else:
-                    raise
+        for val in iter_read(fd, IOC.ENUM_FRAMEINTERVALS, val):
             # values come in frame interval (fps = 1/interval)
             try:
                 ftype = FrameIntervalType(val.type)
@@ -163,9 +178,7 @@ def frame_sizes(fd, pixel_formats):
                 break
             if size.type == FrameSizeType.DISCRETE:
                 sizes += get_frame_intervals(
-                    pixel_format,
-                    size.discrete.width,
-                    size.discrete.height
+                    pixel_format, size.discrete.width, size.discrete.height
                 )
             size.index += 1
     return sizes
@@ -175,6 +188,26 @@ def read_capabilities(fd):
     caps = raw.v4l2_capability()
     fcntl.ioctl(fd, IOC.QUERYCAP.value, caps)
     return caps
+
+
+def iter_read_formats(fd, type):
+    fmt = raw.v4l2_fmtdesc()
+    fmt.type = type
+    pixel_formats = set(PixelFormat)
+    for fmt in iter_read(fd, IOC.ENUM_FMT, fmt):
+        pixel_fmt = fmt.pixelformat
+        if pixel_fmt not in pixel_formats:
+            logging.debug(
+                "unknown pixel format %s (%d)", human_pixel_format(pixel_fmt), pixel_fmt
+            )
+            continue
+        image_format = ImageFormat(
+            type=type,
+            flags=ImageFormatFlag(fmt.flags),
+            description=fmt.description.decode(),
+            pixel_format=PixelFormat(pixel_fmt),
+        )
+        yield image_format
 
 
 def read_info(fd):
@@ -197,32 +230,12 @@ def read_info(fd):
         BufferType.VIDEO_OVERLAY,
     } & set(buffers)
 
-    formats = []
+    image_formats = []
     pixel_formats = set()
     for stream_type in img_fmt_stream_types:
-        fmt.type = stream_type
-        for index in range(128):
-            fmt.index = index
-            try:
-                fcntl.ioctl(fd, IOC.ENUM_FMT.value, fmt)
-            except OSError as error:
-                if error.errno == errno.EINVAL:
-                    break
-                else:
-                    raise
-            try:
-                pixel_format = PixelFormat(fmt.pixelformat)
-            except ValueError:
-                continue
-            formats.append(
-                ImageFormat(
-                    type=stream_type,
-                    flags=ImageFormatFlag(fmt.flags),
-                    description=fmt.description.decode(),
-                    pixel_format=pixel_format,
-                )
-            )
-            pixel_formats.add(pixel_format)
+        for image_format in iter_read_formats(fd, stream_type):
+            image_formats.append(image_format)
+            pixel_formats.add(image_format.pixel_format)
 
     crop = raw.v4l2_cropcap()
     crop_stream_types = {
@@ -261,13 +274,29 @@ def read_info(fd):
         card=caps.card.decode(),
         bus_info=caps.bus_info.decode(),
         version=version_str,
-        physical_capabilities=Capability(caps.capabilities),
-        capabilities=device_capabilities,
+        capabilities=Capability(caps.capabilities),
+        device_capabilities=device_capabilities,
         crop_capabilities=crop_caps,
         buffers=buffers,
-        formats=formats,
+        formats=image_formats,
         frame_sizes=frame_sizes(fd, pixel_formats),
     )
+
+
+def request_buffers(
+    fd,
+    type: BufferType = BufferType.VIDEO_CAPTURE,
+    memory: Memory = Memory.MMAP,
+    count: int = 1,
+):
+    req = raw.v4l2_requestbuffers()
+    req.count = count
+    req.type = type
+    req.memory = memory
+    fcntl.ioctl(fd, IOC.REQBUFS.value, req)
+    if not req.count:
+        raise IOError("Not enough buffer memory")
+    return req
 
 
 def fopen(path, rw=False):
@@ -279,19 +308,19 @@ def opener(path, flags):
 
 
 class Device:
-    def __init__(self, filename):
+    def __init__(self, filename, read_write=True):
         filename = pathlib.Path(filename)
         self._log = log.getChild(filename.stem)
+        self._read_write = read_write
         self._context_level = 0
-        self._fobj = fopen(filename, rw=True)
-        self.info = read_info(self.fileno())
+        self._fobj = None
         self.filename = filename
-        if Capability.VIDEO_CAPTURE in self.info.capabilities:
-            self.video_capture = VideoCapture(self)
-        else:
-            self.video_capture = None
+        self.info = None
 
     def __enter__(self):
+        if not self._context_level:
+            self.open()
+            self.info = read_info(self)
         self._context_level += 1
         return self
 
@@ -300,53 +329,55 @@ class Device:
         if not self._context_level:
             self.close()
 
-    def __iter__(self):
-        return iter(self.video_capture)
+    def __repr__(self):
+        return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
 
     def _ioctl(self, request, arg=0):
-        return fcntl.ioctl(self, request, arg)
+        return fcntl.ioctl(self, request.value, arg)
 
     @classmethod
     def from_id(self, did):
         return Device("/dev/video{}".format(did))
 
+    def open(self):
+        if not self._fobj:
+            self._fobj = fopen(self.filename, self._read_write)
+
     def close(self):
         if not self.closed:
             self._log.info("closing")
             self._fobj.close()
+            self._fobj = None
+            self.info = None
 
     def fileno(self):
         return self._fobj.fileno()
 
     @property
     def closed(self):
-        return self._fobj.closed
+        return self._fobj is None or self._fobj.closed
 
 
-class VideoCapture:
-
-    buffer_type = BufferType.VIDEO_CAPTURE
-
+class DeviceHelper:
     def __init__(self, device):
         self.device = device
 
-    def __iter__(self):
-        return iter(VideoStream(self))
-
     def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request.value, arg=arg)
+        return self.device._ioctl(request, arg=arg)
 
-    @property
+
+class Buffer(DeviceHelper):
+    def __init__(self, device, buffer_type):
+        super().__init__(device)
+        self.buffer_type = buffer_type
+
     def formats(self):
-        return [fmt for fmt in self.device.info.formats if fmt.type == self.buffer_type]
+        formats = self.device.info.formats
+        return [fmt for fmt in formats if fmt.type == self.buffer_type]
 
-    @property
     def crop_capabilities(self):
-        return [
-            crop
-            for crop in self.device.info.crop_capabilities
-            if crop.type == self.buffer_type
-        ]
+        crop_capabilities = self.device.info.crop_capabilities
+        return [crop for crop in crop_capabilities if crop.type == self.buffer_type]
 
     def set_format(self, width, height, pixel_format="MJPG"):
         f = raw.v4l2_format()
@@ -394,6 +425,14 @@ class VideoCapture:
             self._ioctl(IOC.STREAMOFF, btype)
 
 
+class VideoCapture(Buffer):
+    def __init__(self, device):
+        super().__init__(device, BufferType.VIDEO_CAPTURE)
+
+    def __iter__(self):
+        return iter(VideoStream(self))
+
+
 class BaseBuffer:
     def __init__(
         self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True
@@ -420,7 +459,7 @@ class BaseBuffer:
             self.close()
 
     def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request.value, arg=arg)
+        return self.device._ioctl(request, arg=arg)
 
     def close(self):
         pass
@@ -463,14 +502,12 @@ class Buffers:
         device,
         buffer_type=BufferType.VIDEO_CAPTURE,
         buffer_size=1,
-        buffer_queue=True,
         memory=Memory.MMAP,
     ):
         self._context_level = 0
         self.device = device
         self.buffer_size = buffer_size
         self.buffer_type = buffer_type
-        self.buffer_queue = buffer_queue
         self.memory = memory
         self.buffers = self._create_buffers()
 
@@ -484,21 +521,16 @@ class Buffers:
             self.close()
 
     def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request.value, arg=arg)
+        return self.device._ioctl(request, arg=arg)
 
     def _create_buffers(self):
         if self.memory != Memory.MMAP:
             raise TypeError(f"Unsupported buffer type {self.memory.name!r}")
-        r = raw.v4l2_requestbuffers()
-        r.count = self.buffer_size
-        r.type = self.buffer_type
-        r.memory = self.memory
-        self._ioctl(IOC.REQBUFS, r)
-        if not r.count:
-            raise IOError("Not enough buffer memory")
+        r = request_buffers(
+            self.device, self.buffer_type, self.memory, self.buffer_size
+        )
         return [
-            BufferMMAP(self.device, index, self.buffer_type, self.buffer_queue)
-            for index in range(r.count)
+            BufferMMAP(self.device, index, self.buffer_type) for index in range(r.count)
         ]
 
     def close(self):
@@ -513,6 +545,7 @@ class Buffers:
         self._ioctl(IOC.REQBUFS, r)
 
     def raw_read(self):
+        # ask which buffer is ready
         buff = self.buffers[0]._v4l2_buffer()
         self._ioctl(IOC.DQBUF, buff)
         return self.buffers[buff.index].raw_read(buff)
@@ -523,17 +556,11 @@ class Buffers:
 
 
 class VideoStream:
-    def __init__(
-        self, video_capture, buffer_size=1, buffer_queue=True, memory=Memory.MMAP
-    ):
+    def __init__(self, video_capture, buffer_size=2, memory=Memory.MMAP):
         self._context_level = 0
         self.video_capture = video_capture
         self.buffers = Buffers(
-            video_capture.device,
-            video_capture.buffer_type,
-            buffer_size,
-            buffer_queue,
-            memory,
+            video_capture.device, video_capture.buffer_type, buffer_size, memory
         )
 
     def __enter__(self):
