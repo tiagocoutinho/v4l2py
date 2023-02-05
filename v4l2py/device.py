@@ -514,8 +514,14 @@ class Device(ReentrantContextManager):
     def request_buffers(self, buffer_type, memory, size):
         return request_buffers(self.fileno(), buffer_type, memory, size)
 
+    def create_buffers(self, buffer_type: BufferType, memory: Memory, count: int) -> list[raw.v4l2_buffer]:
+        return create_buffers(self.fileno(), buffer_type, memory, count)
+
     def free_buffers(self, buffer_type, memory):
         return free_buffers(self.fileno(), buffer_type, memory)
+
+    def enqueue_buffers(self, buffer_type: BufferType, memory: Memory, count: int) -> list[raw.v4l2_buffer]:
+        return enqueue_buffers(self.fileno(), buffer_type, memory, count)
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
         return set_format(self.fileno(), buffer_type, width, height, pixel_format="MJPG")
@@ -543,50 +549,60 @@ class DeviceHelper:
 
 
 class BufferManager(DeviceHelper):
-    def __init__(self, device: Device, buffer_type):
+    def __init__(self, device: Device, buffer_type: BufferType, size: int = 2):
         super().__init__(device)
-        self.buffer_type = buffer_type
+        self.type = buffer_type
+        self.size = size
+        self.buffers = None
 
     def formats(self):
         formats = self.device.info.formats
-        return [fmt for fmt in formats if fmt.type == self.buffer_type]
+        return [fmt for fmt in formats if fmt.type == self.type]
 
     def crop_capabilities(self):
         crop_capabilities = self.device.info.crop_capabilities
-        return [crop for crop in crop_capabilities if crop.type == self.buffer_type]
+        return [crop for crop in crop_capabilities if crop.type == self.type]
 
     def query_buffer(self, memory, index):
-        return self.device.query_buffer(self.buffer_type, memory, index)
+        return self.device.query_buffer(self.type, memory, index)
 
     def enqueue_buffer(self, memory: Memory, index: int) -> raw.v4l2_buffer:
-        return self.device.enqueue_buffer(self.buffer_type, memory, index)
+        return self.device.enqueue_buffer(self.type, memory, index)
 
     def dequeue_buffer(self, memory: Memory) -> raw.v4l2_buffer:
-        return self.device.dequeue_buffer(self.buffer_type, memory)
+        return self.device.dequeue_buffer(self.type, memory)
 
-    def request_buffers(self, memory, size):
-        return self.device.request_buffers(self.buffer_type, memory, size)
+    def enqueue_buffers(self, memory: Memory) -> list[raw.v4l2_buffer]:
+        return self.device.enqueue_buffers(self.type, memory, self.size)
 
-    def free_buffers(self, memory):
-        return self.device.free_buffers(self.buffer_type, memory)
+    def free_buffers(self, memory: Memory):
+        result = self.device.free_buffers(self.type, memory)
+        self.buffers = None
+        return result
+
+    def create_buffers(self, memory: Memory):
+        if self.buffers:
+            raise V4L2Error("buffers already requested. free first")
+        self.buffers = self.device.create_buffers(self.type, memory, self.size)
+        return self.buffers
 
     def set_format(self, width, height, pixel_format="MJPG"):
-        return self.device.set_format(self.buffer_type, width, height, pixel_format)
+        return self.device.set_format(self.type, width, height, pixel_format)
 
     def get_format(self):
-        return self.device.get_format(self.buffer_type)
+        return self.device.get_format(self.type)
 
     def set_fps(self, fps):
-        return self.device.set_fps(self.buffer_type, fps)
+        return self.device.set_fps(self.type, fps)
 
     def get_fps(self):
-        return self.device.get_fps(self.buffer_type)
+        return self.device.get_fps(self.type)
 
     def stream_on(self):
-        self.device.stream_on(self.buffer_type)
+        self.device.stream_on(self.type)
 
     def stream_off(self):
-        self.device.stream_off(self.buffer_type)
+        self.device.stream_off(self.type)
 
     start = stream_on
     stop = stream_off
@@ -606,7 +622,7 @@ class VideoCapture(BufferManager, ReentrantContextManager):
 
     def open(self):
         if self.buffer is None:
-            self.buffer = MemoryMap(self, 10)
+            self.buffer = MemoryMap(self)
             self.buffer.open()
             self.stream_on()
 
@@ -638,10 +654,9 @@ class QueueReader:
 
 class MemoryMap(ReentrantContextManager):
 
-    def __init__(self, buffer_manager: BufferManager, count=1):
+    def __init__(self, buffer_manager: BufferManager):
         super().__init__()
         self.buffer_manager = buffer_manager
-        self.count = count
         self.buffers = None
         self.reader = QueueReader(buffer_manager, Memory.MMAP)
 
@@ -652,9 +667,9 @@ class MemoryMap(ReentrantContextManager):
     def open(self):
         if self.buffers is None:
             fd = self.buffer_manager.device.fileno()
-            buffer_type = self.buffer_manager.buffer_type
-            self.buffers = create_mmap_buffers(fd, buffer_type, Memory.MMAP, self.count)
-            enqueue_buffers(fd, buffer_type, Memory.MMAP, self.count)
+            buffers = self.buffer_manager.create_buffers(Memory.MMAP)
+            self.buffers = [mmap_from_buffer(fd, buff) for buff in buffers]
+            self.buffer_manager.enqueue_buffers(Memory.MMAP)
         
     def close(self):
         if self.buffers:
@@ -670,170 +685,6 @@ class MemoryMap(ReentrantContextManager):
     def read(self):
         select.select((self.buffer_manager.device,), (), ())
         return self.raw_read()
-
-
-class BaseBuffer:
-    def __init__(
-        self, device, index=0, buffer_type=BufferType.VIDEO_CAPTURE, queue=True
-    ):
-        self._context_level = 0
-        self.device = device
-        self.index = index
-        self.buffer_type = buffer_type
-        self.queue = queue
-
-    def _v4l2_buffer(self):
-        buff = raw.v4l2_buffer()
-        buff.index = self.index
-        buff.type = self.buffer_type
-        return buff
-
-    def __enter__(self):
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
-
-    def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request, arg=arg)
-
-    def close(self):
-        pass
-
-class BufferMMAP(BaseBuffer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        buff = self._v4l2_buffer()
-        self._ioctl(IOC.QUERYBUF, buff)
-        self.mmap = mem_map(self.device, buff.length, offset=buff.m.offset)
-        self.length = buff.length
-        if self.queue:
-            self._ioctl(IOC.QBUF, buff)
-
-    def _v4l2_buffer(self):
-        buff = super()._v4l2_buffer()
-        buff.memory = Memory.MMAP
-        return buff
-
-    def close(self):
-        if self.mmap is not None:
-            self.mmap.close()
-            self.mmap = None
-
-    def raw_read(self, buff):
-        result = self.mmap[: buff.bytesused]
-        if self.queue:
-            self._ioctl(IOC.QBUF, buff)
-        return result
-
-    def read(self, buff):
-        select.select((self.device,), (), ())
-        return self.raw_read(buff)
-
-
-class Buffers:
-    def __init__(
-        self,
-        device,
-        buffer_type=BufferType.VIDEO_CAPTURE,
-        buffer_size=1,
-        memory=Memory.MMAP,
-    ):
-        self._context_level = 0
-        self.device = device
-        self.buffer_size = buffer_size
-        self.buffer_type = buffer_type
-        self.memory = memory
-        self.buffers = self._create_buffers()
-
-    def __enter__(self):
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
-
-    def _ioctl(self, request, arg=0):
-        return self.device._ioctl(request, arg=arg)
-
-    def _create_buffers(self):
-        if self.memory != Memory.MMAP:
-            raise TypeError(f"Unsupported buffer type {self.memory.name!r}")
-        r = request_buffers(
-            self.device, self.buffer_type, self.memory, self.buffer_size
-        )
-        return [
-            BufferMMAP(self.device, index, self.buffer_type) for index in range(r.count)
-        ]
-
-    def close(self):
-        if self.buffers:
-            for buff in self.buffers:
-                buff.close()
-            self.buffers = None
-        r = raw.v4l2_requestbuffers()
-        r.count = 0
-        r.type = self.buffer_type
-        r.memory = self.memory
-        self._ioctl(IOC.REQBUFS, r)
-
-    def raw_read(self):
-        # ask which buffer is ready
-        buff = self.buffers[0]._v4l2_buffer()
-        self._ioctl(IOC.DQBUF, buff)
-        return self.buffers[buff.index].raw_read(buff)
-
-    def read(self):
-        select.select((self.device,), (), ())
-        return self.raw_read()
-
-
-class VideoStream:
-    def __init__(self, video_capture, buffer_size=1, memory=Memory.MMAP):
-        self._context_level = 0
-        self.video_capture = video_capture
-        self.buffers = Buffers(
-            video_capture.device, video_capture.buffer_type, buffer_size, memory
-        )
-
-    def __enter__(self):
-        self._context_level += 1
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        self._context_level -= 1
-        if not self._context_level:
-            self.close()
-
-    def __iter__(self):
-        return Stream(self)
-
-    async def __aiter__(self):
-        async for frame in AsyncStream(self):
-            yield frame
-
-    def close(self):
-        self.buffers.close()
-
-    def raw_read(self):
-        return self.buffers.raw_read()
-
-    def read(self):
-        return self.buffers.read()
-
-
-def Stream(stream):
-    stream.video_capture.stream_on()
-    try:
-        while True:
-            yield stream.read()
-    finally:
-        stream.video_capture.stream_off()
 
 
 async def AsyncStream(stream):
