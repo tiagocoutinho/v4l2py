@@ -621,8 +621,8 @@ class v4l2_requestbuffers(ctypes.Structure):
 class v4l2_buffer(ctypes.Structure):
     class _u(ctypes.Union):
         _fields_ = [
-            ("offset", ctypes.c_uint32),
-            ("userptr", ctypes.c_ulong),
+            ("offset", ctypes.c_uint32), # V4L2_MEMORY_MMAP
+            ("userptr", ctypes.c_ulong), # V4L2_MEMORY_USERPTR
         ]
 
     _fields_ = [
