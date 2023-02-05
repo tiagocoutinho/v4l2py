@@ -606,7 +606,7 @@ class VideoCapture(BufferManager, ReentrantContextManager):
 
     def open(self):
         if self.buffer is None:
-            self.buffer = MemoryMap(self, 1)
+            self.buffer = MemoryMap(self, 10)
             self.buffer.open()
             self.stream_on()
 
