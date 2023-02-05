@@ -8,7 +8,7 @@
 
 import flask
 
-from v4l2py import Device, VideoCapture, VideoStream
+from v4l2py import Device, VideoCapture
 
 app = flask.Flask("basic-web-cam")
 

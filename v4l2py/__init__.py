@@ -4,6 +4,6 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-from .device import Device, VideoCapture, VideoStream
+from .device import Device, VideoCapture
 
 __version__ = "0.6.2"

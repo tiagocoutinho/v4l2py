@@ -474,9 +474,6 @@ class Device(ReentrantContextManager):
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
 
-    def _ioctl(self, request, arg=0):
-        return ioctl(self.fileno(), request, arg)
-
     @classmethod
     def from_id(cls, did):
         return cls("/dev/video{}".format(did))
@@ -486,6 +483,7 @@ class Device(ReentrantContextManager):
             self._log.info("opening %s", self.filename)
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
+            self.video_capture = VideoCapture(self)
             self._log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
@@ -608,7 +606,7 @@ class BufferManager(DeviceHelper):
     stop = stream_off
 
 
-class VideoCapture(BufferManager, ReentrantContextManager):
+class VideoCapture(BufferManager):
     def __init__(self, device: Device):
         super().__init__(device, BufferType.VIDEO_CAPTURE)
         self.buffer = None
@@ -633,23 +631,6 @@ class VideoCapture(BufferManager, ReentrantContextManager):
 
     def __iter__(self):
         yield from self.buffer
-
-
-class QueueReader:
-    def __init__(self, buffer_manager: BufferManager, memory: Memory):
-        self.buffer_manager = buffer_manager
-        self.memory = memory
-        self.index = None
-
-    def __enter__(self):
-        # get next buffer that has some data in it
-        buffer = self.buffer_manager.dequeue_buffer(self.memory)
-        self.index = buffer.index
-        return buffer
-
-    def __exit__(self, *exc):
-        self.buffer_manager.enqueue_buffer(self.memory, self.index)
-        self.index = None
 
 
 class MemoryMap(ReentrantContextManager):
@@ -685,6 +666,23 @@ class MemoryMap(ReentrantContextManager):
     def read(self):
         select.select((self.buffer_manager.device,), (), ())
         return self.raw_read()
+
+
+class QueueReader:
+    def __init__(self, buffer_manager: BufferManager, memory: Memory):
+        self.buffer_manager = buffer_manager
+        self.memory = memory
+        self.index = None
+
+    def __enter__(self):
+        # get next buffer that has some data in it
+        buffer = self.buffer_manager.dequeue_buffer(self.memory)
+        self.index = buffer.index
+        return buffer
+
+    def __exit__(self, *exc):
+        self.buffer_manager.enqueue_buffer(self.memory, self.index)
+        self.index = None
 
 
 async def AsyncStream(stream):
