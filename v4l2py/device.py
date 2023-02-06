@@ -6,6 +6,7 @@
 
 import asyncio
 import collections
+import ctypes
 import enum
 import errno
 import fcntl
@@ -400,6 +401,41 @@ def stream_off(fd, buffer_type):
     return ioctl(fd, IOC.STREAMOFF, btype)
 
 
+def set_selection(fd, buffer_type, rectangles):
+    sel = raw.v4l2_selection()
+    sel.type = buffer_type
+    sel.target = raw.V4L2_SEL_TGT_CROP
+    sel.rectangles = len(rectangles)
+    rects = (raw.v4l2_ext_rect * sel.rectangles)()
+
+    for i in range(sel.rectangles):
+        rects[i].r.left = rectangles[i].left
+        rects[i].r.top = rectangles[i].top
+        rects[i].r.width = rectangles[i].width
+        rects[i].r.height = rectangles[i].height
+
+    sel.pr = ctypes.cast(ctypes.pointer(rects), ctypes.POINTER(raw.v4l2_ext_rect))
+    ioctl(fd, IOC.S_SELECTION, sel)
+
+
+def get_selection(fd, buffer_type, max_nb=128):
+    sel = raw.v4l2_selection()
+    sel.type = buffer_type
+    sel.rectangles = max_nb
+    rects = (raw.v4l2_ext_rect * sel.rectangles)()
+    sel.pr = ctypes.cast(ctypes.pointer(rects), ctypes.POINTER(raw.v4l2_ext_rect))
+    ioctl(fd, IOC.G_SELECTION, sel)
+    if sel.rectangles == 0:
+        return Rect(
+            left=sel.r.left, top=sel.r.top, width=sel.r.width, height=sel.r.height
+        )
+    else:
+        return [
+            Rect(left=rects[i].r.left, top=rects[i].r.top, width=rects[i].r.width, height=rects[i].r.height) 
+            for i in range(sel.rectangles)
+        ]
+
+
 def fopen(path, rw=False):
     return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
 
@@ -532,6 +568,12 @@ class Device(ReentrantContextManager):
     def get_fps(self, buffer_type):
         return get_fps(self.fileno(), buffer_type)
 
+    def set_selection(self, buffer_type, rectangles):
+        return set_selection(self.fileno(), buffer_type, rectangles)
+
+    def get_selection(self, buffer_type):
+        return get_selection(self.fileno(), buffer_type)
+
     def stream_on(self, buffer_type):
         stream_on(self.fileno(), buffer_type)
 
@@ -594,6 +636,12 @@ class BufferManager(DeviceHelper):
 
     def get_fps(self):
         return self.device.get_fps(self.type)
+
+    def set_selection(self, rectangles):
+        return self.device.set_selection(self.type, rectangles)
+
+    def get_selection(self):
+        return self.device.get_selection(self.type)
 
     def stream_on(self):
         self.device.stream_on(self.type)
