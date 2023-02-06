@@ -47,6 +47,9 @@ Field = _enum("Field", "V4L2_FIELD_")
 FrameSizeType = _enum("FrameSizeType", "V4L2_FRMSIZE_TYPE_")
 FrameIntervalType = _enum("FrameIntervalType", "V4L2_FRMIVAL_TYPE_")
 IOC = _enum("IOC", "VIDIOC_", klass=enum.Enum)
+InputStatus = _enum("InputStatus", "V4L2_IN_ST_", klass=enum.IntFlag)
+InputType = _enum("InputType", "V4L2_INPUT_TYPE_")
+InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFlag)
 
 
 def human_pixel_format(ifmt):
@@ -58,7 +61,7 @@ PixelFormat.human_str = lambda self: human_pixel_format(self.value)
 
 Info = collections.namedtuple(
     "Info",
-    "driver card bus_info version capabilities device_capabilities crop_capabilities buffers formats frame_sizes",
+    "driver card bus_info version capabilities device_capabilities crop_capabilities buffers formats frame_sizes inputs",
 )
 
 ImageFormat = collections.namedtuple(
@@ -77,6 +80,10 @@ Size = collections.namedtuple("Size", "width height")
 
 FrameType = collections.namedtuple(
     "FrameType", "type pixel_format width height min_fps max_fps step_fps"
+)
+
+Input = collections.namedtuple(
+    "InputType", "index name type audioset tuner std status capabilities"
 )
 
 
@@ -231,8 +238,8 @@ def iter_read_formats(fd, type):
     for fmt in iter_read(fd, IOC.ENUM_FMT, fmt):
         pixel_fmt = fmt.pixelformat
         if pixel_fmt not in pixel_formats:
-            log.debug(
-                "unknown pixel format %s (%d)", human_pixel_format(pixel_fmt), pixel_fmt
+            log.warning(
+                "ignored unknown pixel format %s (%d)", human_pixel_format(pixel_fmt), pixel_fmt
             )
             continue
         image_format = ImageFormat(
@@ -242,6 +249,22 @@ def iter_read_formats(fd, type):
             pixel_format=PixelFormat(pixel_fmt),
         )
         yield image_format
+
+
+def iter_read_inputs(fd):
+    inp = raw.v4l2_input()
+    for inp in iter_read(fd, IOC.ENUMINPUT, inp):
+        input_type = Input(
+            index=inp.index,
+            name=inp.name.decode(),
+            type=InputType(inp.type),
+            audioset=inp.audioset,
+            tuner=inp.tuner,
+            std=inp.std,
+            status=InputStatus(inp.status),
+            capabilities=InputCapabilities(inp.capabilities)
+        )
+        yield input_type
 
 
 def read_info(fd):
@@ -287,6 +310,9 @@ def read_info(fd):
         crop_cap = CropCapability.from_raw(stream_type, crop)
         crop_caps.append(crop_cap)
 
+    inputs = list(iter_read_inputs(fd))
+
+
     return Info(
         driver=caps.driver.decode(),
         card=caps.card.decode(),
@@ -298,6 +324,7 @@ def read_info(fd):
         buffers=buffers,
         formats=image_formats,
         frame_sizes=frame_sizes(fd, pixel_formats),
+        inputs=inputs,
     )
 
 

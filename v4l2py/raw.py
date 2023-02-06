@@ -995,7 +995,8 @@ class v4l2_input(ctypes.Structure):
         ("tuner", ctypes.c_uint32),
         ("std", v4l2_std_id),
         ("status", ctypes.c_uint32),
-        ("reserved", ctypes.c_uint32 * 4),
+        ("capabilities", ctypes.c_uint32),
+        ("reserved", ctypes.c_uint32 * 3),
     ]
 
 
