@@ -4,6 +4,7 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
+import asyncio
 import collections
 import enum
 import errno
@@ -445,20 +446,14 @@ class ReentrantContextManager:
 
     def __enter__(self):
         if not self._context_level:
-            self._on_enter()
+            self.open()
         self._context_level += 1
         return  self
 
     def __exit__(self, *exc):
         self._context_level -= 1
         if not self._context_level:
-            self._on_exit(*exc)
-
-    def _on_enter(self):
-        self.open()
-
-    def _on_exit(self, *exc):
-        self.close()
+            self.close()
 
 
 class Device(ReentrantContextManager):
@@ -473,6 +468,10 @@ class Device(ReentrantContextManager):
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
+
+    def __iter__(self):
+        with VideoCapture(self) as stream:
+            yield from stream
 
     @classmethod
     def from_id(cls, did):
@@ -607,16 +606,23 @@ class BufferManager(DeviceHelper):
 
 
 class VideoCapture(BufferManager):
-    def __init__(self, device: Device):
-        super().__init__(device, BufferType.VIDEO_CAPTURE)
+    def __init__(self, device: Device, size: int = 2):
+        super().__init__(device, BufferType.VIDEO_CAPTURE, size)
         self.buffer = None
 
     def __enter__(self):
         self.open()
-        return  self.buffer
+        return self.buffer
 
     def __exit__(self, *exc):
         self.close()
+
+    def __iter__(self):
+        yield from self.buffer
+
+    async def __aiter__(self):
+        async for frame in self.buffer:
+            yield frame
 
     def open(self):
         if self.buffer is None:
@@ -628,9 +634,6 @@ class VideoCapture(BufferManager):
         if self.buffer:
             self.buffer.close()
             self.stream_off()
-
-    def __iter__(self):
-        yield from self.buffer
 
 
 class MemoryMap(ReentrantContextManager):
@@ -644,6 +647,19 @@ class MemoryMap(ReentrantContextManager):
     def __iter__(self):
         while True:
             yield self.read()
+
+    async def __aiter__(self):
+        device = self.buffer_manager.device
+        loop = asyncio.get_event_loop()
+        event = asyncio.Event()
+        loop.add_reader(device.fileno(), event.set)
+        try:
+            while True:
+                await event.wait()
+                event.clear()
+                yield self.raw_read()
+        finally:
+            loop.remove_reader(device.fileno())
 
     def open(self):
         if self.buffers is None:
@@ -660,8 +676,14 @@ class MemoryMap(ReentrantContextManager):
             self.buffers = None
     
     def raw_read(self):
+        import time
+        start = time.monotonic()
         with self.reader as buff:
-            return self.buffers[buff.index][:buff.bytesused]
+            data = self.buffers[buff.index][:buff.bytesused]
+        dt = time.monotonic() - start
+        if dt > 0.01:
+            log.error("read took %d", dt)
+        return data
 
     def read(self):
         select.select((self.buffer_manager.device,), (), ())
@@ -683,25 +705,6 @@ class QueueReader:
     def __exit__(self, *exc):
         self.buffer_manager.enqueue_buffer(self.memory, self.index)
         self.index = None
-
-
-async def AsyncStream(stream):
-    import asyncio
-
-    cap = stream.video_capture
-    fd = cap.device.fileno()
-    loop = asyncio.get_event_loop()
-    event = asyncio.Event()
-    loop.add_reader(fd, event.set)
-    try:
-        cap.stream_on()
-        while True:
-            await event.wait()
-            event.clear()
-            yield stream.raw_read()
-    finally:
-        cap.stream_off()
-        loop.remove_reader(fd)
 
 
 def iter_video_files(path="/dev"):
