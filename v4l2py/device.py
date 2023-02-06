@@ -397,6 +397,33 @@ class VideoCapture:
             / p.parm.capture.timeperframe.numerator
         )
 
+    def set_crop(self, left, top, width, height):
+        crop = raw.v4l2_crop()
+        crop.type = self.buffer_type
+        rect = raw.v4l2_rect()
+        rect.left = left
+        rect.top = top
+        rect.width = width
+        rect.height = height
+        crop.c = rect
+        try:
+            return self._ioctl(IOC.S_CROP, crop)
+        except OSError as error:
+            #print(error.errno)
+            raise
+
+    def get_crop(self):
+        crop = raw.v4l2_crop()
+        crop.type = self.buffer_type
+        try:
+            self._ioctl(IOC.G_CROP, crop)
+        except OSError as error:
+            #print(error.errno)
+            raise
+        return Rect(
+            left=crop.c.left, top=crop.c.top, width=crop.c.width, height=crop.c.height
+        )
+
     def start(self):
         btype = raw.v4l2_buf_type(self.buffer_type)
         self._ioctl(IOC.STREAMON, btype)
