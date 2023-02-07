@@ -8,7 +8,7 @@
 
 import flask
 
-from v4l2py import Device, VideoCapture
+from v4l2py import Device
 
 app = flask.Flask("basic-web-cam")
 
@@ -18,12 +18,9 @@ SUFFIX = b"\r\n"
 
 
 def gen_frames():
-    with Device.from_id(0) as dev:
-        capture = VideoCapture(dev)
-        capture.set_format(640, 480, "MJPG")
-        with capture as stream:
-            for frame in stream:
-                yield b"".join((PREFIX, frame, SUFFIX))
+    with Device.from_id(1) as stream:
+        for frame in stream:
+            yield b"".join((PREFIX, frame, SUFFIX))
 
 
 @app.route("/")
@@ -38,7 +35,4 @@ def stream():
     )
 
 
-if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level="DEBUG")
-    app.run(host="0.0.0.0")
+app.run(host="0.0.0.0")
