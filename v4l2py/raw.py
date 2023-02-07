@@ -1144,6 +1144,7 @@ class v4l2_queryctrl(ctypes.Structure):
 
 V4L2_CTRL_MAX_DIMS = 4
 
+
 class v4l2_query_ext_ctrl(ctypes.Structure):
     _fields_ = [
         ("id", ctypes.c_uint32),

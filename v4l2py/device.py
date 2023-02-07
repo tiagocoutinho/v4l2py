@@ -282,7 +282,7 @@ def iter_read_controls(fd):
             ctrl_ext.type & raw.V4L2_CTRL_TYPE_CTRL_CLASS
         ):
             yield copy.deepcopy(ctrl_ext)
-        ctrl_ext.id |= (raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND)
+        ctrl_ext.id |= raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
 
 
 def read_info(fd):
@@ -339,7 +339,7 @@ def read_info(fd):
         formats=image_formats,
         frame_sizes=frame_sizes(fd, pixel_formats),
         inputs=list(iter_read_inputs(fd)),
-        controls=list(iter_read_controls(fd))
+        controls=list(iter_read_controls(fd)),
     )
 
 
@@ -683,7 +683,6 @@ class Device(ReentrantContextManager):
 
 
 class Control:
-
     def __init__(self, device, info):
         self.device = device
         self.info = info
@@ -822,7 +821,7 @@ class MemoryMap(ReentrantContextManager):
         loop.add_reader(device.fileno(), event.set)
         try:
             while True:
-                select.select((device,),(),())
+                select.select((device,), (), ())
                 await event.wait()
                 event.clear()
                 yield self.raw_read()
