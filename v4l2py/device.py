@@ -403,9 +403,11 @@ def get_format(fd, buffer_type):
 
 
 def set_fps(fd, buffer_type, fps):
+    #v4l2 fraction is u32
+    max_denominator = int(min(2**32, 2**32/fps))
     p = raw.v4l2_streamparm()
     p.type = buffer_type
-    fps = fractions.Fraction(fps)
+    fps = fractions.Fraction(fps).limit_denominator(max_denominator)
     p.parm.capture.timeperframe.numerator = fps.denominator
     p.parm.capture.timeperframe.denominator = fps.numerator
     return ioctl(fd, IOC.S_PARM, p)
