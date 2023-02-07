@@ -1,7 +1,13 @@
 import logging
 
-from v4l2py.device import fopen, set_format, BufferType, Memory, create_mmap_buffer, query_buffer
-
+from v4l2py.device import (
+    BufferType,
+    Memory,
+    create_mmap_buffer,
+    fopen,
+    query_buffer,
+    set_format,
+)
 
 VideoCapture = BufferType.VideoCapture
 MMAP = Memory.MMAP

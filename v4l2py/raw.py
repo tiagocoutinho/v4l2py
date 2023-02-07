@@ -264,11 +264,13 @@ class v4l2_rect(ctypes.Structure):
         ("height", ctypes.c_int32),
     ]
 
+
 class v4l2_ext_rect(ctypes.Structure):
     _fields_ = [
         ("r", v4l2_rect),
         ("reserved", ctypes.c_int32 * 4),
     ]
+
 
 class v4l2_fract(ctypes.Structure):
     _fields_ = [
@@ -626,8 +628,8 @@ class v4l2_requestbuffers(ctypes.Structure):
 class v4l2_buffer(ctypes.Structure):
     class _u(ctypes.Union):
         _fields_ = [
-            ("offset", ctypes.c_uint32), # V4L2_MEMORY_MMAP
-            ("userptr", ctypes.c_ulong), # V4L2_MEMORY_USERPTR
+            ("offset", ctypes.c_uint32),  # V4L2_MEMORY_MMAP
+            ("userptr", ctypes.c_ulong),  # V4L2_MEMORY_USERPTR
         ]
 
     _fields_ = [
@@ -762,22 +764,24 @@ class v4l2_crop(ctypes.Structure):
         ("c", v4l2_rect),
     ]
 
+
 # Selection interface definitions from 'v4l2-common.h'
 
 # Selection TARGET
-V4L2_SEL_TGT_CROP		= 0x0000
-V4L2_SEL_TGT_CROP_DEFAULT	= 0x0001
-V4L2_SEL_TGT_CROP_BOUNDS	= 0x0002
-V4L2_SEL_TGT_NATIVE_SIZE	= 0x0003
-V4L2_SEL_TGT_COMPOSE		= 0x0100
-V4L2_SEL_TGT_COMPOSE_DEFAULT	= 0x0101
-V4L2_SEL_TGT_COMPOSE_BOUNDS	= 0x0102
-V4L2_SEL_TGT_COMPOSE_PADDED	= 0x0103
+V4L2_SEL_TGT_CROP = 0x0000
+V4L2_SEL_TGT_CROP_DEFAULT = 0x0001
+V4L2_SEL_TGT_CROP_BOUNDS = 0x0002
+V4L2_SEL_TGT_NATIVE_SIZE = 0x0003
+V4L2_SEL_TGT_COMPOSE = 0x0100
+V4L2_SEL_TGT_COMPOSE_DEFAULT = 0x0101
+V4L2_SEL_TGT_COMPOSE_BOUNDS = 0x0102
+V4L2_SEL_TGT_COMPOSE_PADDED = 0x0103
 
 # Selection flags
-V4L2_SEL_FLAG_GE		= (1 << 0)
-V4L2_SEL_FLAG_LE		= (1 << 1)
-V4L2_SEL_FLAG_KEEP_CONFIG	= (1 << 2)
+V4L2_SEL_FLAG_GE = 1 << 0
+V4L2_SEL_FLAG_LE = 1 << 1
+V4L2_SEL_FLAG_KEEP_CONFIG = 1 << 2
+
 
 class v4l2_selection(ctypes.Structure):
     class _u(ctypes.Union):
@@ -795,6 +799,7 @@ class v4l2_selection(ctypes.Structure):
         ("rectangles", ctypes.c_uint32),
         ("u", _u),
     ]
+
 
 #
 # Analog video standard
@@ -1069,10 +1074,19 @@ class v4l2_ext_control(ctypes.Structure):
         _fields_ = [
             ("value", ctypes.c_int32),
             ("value64", ctypes.c_int64),
+            ("string", ctypes.POINTER(ctypes.c_char)),
+            ("p_u8", ctypes.POINTER(ctypes.c_uint8)),
+            ("p_u16", ctypes.POINTER(ctypes.c_uint16)),
+            ("p_u32", ctypes.POINTER(ctypes.c_uint32)),
             ("reserved", ctypes.c_void_p),
         ]
 
-    _fields_ = [("id", ctypes.c_uint32), ("reserved2", ctypes.c_uint32 * 2), ("_u", _u)]
+    _fields_ = [
+        ("id", ctypes.c_uint32),
+        ("size", ctypes.c_uint32),
+        ("reserved2", ctypes.c_uint32 * 2),
+        ("_u", _u),
+    ]
 
     _anonymous_ = ("_u",)
     _pack_ = True
@@ -1083,7 +1097,7 @@ class v4l2_ext_controls(ctypes.Structure):
         ("ctrl_class", ctypes.c_uint32),
         ("count", ctypes.c_uint32),
         ("error_idx", ctypes.c_uint32),
-        ("reserved", ctypes.c_uint32 * 2),
+        ("reserved", ctypes.c_uint32 * 1),
         ("controls", ctypes.POINTER(v4l2_ext_control)),
     ]
 
@@ -1125,6 +1139,26 @@ class v4l2_queryctrl(ctypes.Structure):
         ("default_value", ctypes.c_int32),
         ("flags", ctypes.c_uint32),
         ("reserved", ctypes.c_uint32 * 2),
+    ]
+
+
+V4L2_CTRL_MAX_DIMS = 4
+
+class v4l2_query_ext_ctrl(ctypes.Structure):
+    _fields_ = [
+        ("id", ctypes.c_uint32),
+        ("type", v4l2_ctrl_type),
+        ("name", ctypes.c_char * 32),
+        ("minimum", ctypes.c_int64),
+        ("maximum", ctypes.c_int64),
+        ("step", ctypes.c_uint64),
+        ("default_value", ctypes.c_int64),
+        ("flags", ctypes.c_uint32),
+        ("elem_size", ctypes.c_uint32),
+        ("elems", ctypes.c_uint32),
+        ("nr_of_dims", ctypes.c_uint32),
+        ("dims", ctypes.c_uint32 * V4L2_CTRL_MAX_DIMS),
+        ("reserved", ctypes.c_uint32 * 32),
     ]
 
 
@@ -2049,5 +2083,7 @@ VIDIOC_S_CTRL_OLD = _IOW("V", 28, v4l2_control)
 VIDIOC_G_AUDIO_OLD = _IOWR("V", 33, v4l2_audio)
 VIDIOC_G_AUDOUT_OLD = _IOWR("V", 49, v4l2_audioout)
 VIDIOC_CROPCAP_OLD = _IOR("V", 58, v4l2_cropcap)
+
+VIDIOC_QUERY_EXT_CTRL = _IOWR("V", 103, v4l2_query_ext_ctrl)
 
 BASE_VIDIOC_PRIVATE = 192

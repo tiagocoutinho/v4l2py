@@ -1,8 +1,7 @@
 import logging
 import time
 
-from v4l2py.device import Device, VideoCapture, MemoryMap
-
+from v4l2py.device import Device, MemoryMap, VideoCapture
 
 fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
 logging.basicConfig(level="DEBUG", format=fmt)

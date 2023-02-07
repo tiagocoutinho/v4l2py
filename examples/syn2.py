@@ -3,7 +3,6 @@ import time
 
 from v4l2py.device import Device, VideoCapture
 
-
 fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
 logging.basicConfig(level="DEBUG", format=fmt)
 
