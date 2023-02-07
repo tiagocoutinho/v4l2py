@@ -871,7 +871,7 @@ class QueueReader:
 
 def iter_video_files(path="/dev"):
     path = pathlib.Path(path)
-    return path.glob("video*")
+    return sorted(path.glob("video*"))
 
 
 def iter_devices(path="/dev"):
