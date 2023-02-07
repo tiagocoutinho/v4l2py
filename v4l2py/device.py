@@ -707,8 +707,8 @@ class VideoCapture(BufferManager):
 
     def close(self):
         if self.buffer:
-            self.buffer.close()
             self.stream_off()
+            self.buffer.close()
 
 
 class MemoryMap(ReentrantContextManager):
@@ -751,14 +751,8 @@ class MemoryMap(ReentrantContextManager):
             self.buffers = None
     
     def raw_read(self):
-        import time
-        start = time.monotonic()
         with self.reader as buff:
-            data = self.buffers[buff.index][:buff.bytesused]
-        dt = time.monotonic() - start
-        if dt > 0.01:
-            log.error("read took %d", dt)
-        return data
+            return self.buffers[buff.index][:buff.bytesused]
 
     def read(self):
         select.select((self.buffer_manager.device,), (), ())
