@@ -1,0 +1,13 @@
+# set index = camera.device.index
+# set name = camera.device.info.card
+<div class="card">
+    <div id="stream-{{ index }}">
+        <img src="static/cross.png" alt="no video">
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">{{index}} - {{name}}</h5>
+        <h6 class="card-subtitle mb-2 text-muted">{{camera.device.filename}}</h6>
+        <button type="button" class="btn btn-primary" hx-post="/camera/{{index}}/start" hx-target="#stream-{{index}}">Start</button>
+        <button type="button" class="btn btn-danger" hx-post="/camera/{{index}}/stop" hx-target="#stream-{{index}}">Stop</button> 
+    </div>
+</div>
