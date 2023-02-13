@@ -18,5 +18,3 @@ logging.basicConfig(level="DEBUG", format=fmt)
 device = fopen("/dev/video5")
 set_format(device, VideoCapture, 640, 480, "MJPG")
 memory = create_mmap_buffer(device, VideoCapture, MMAP)
-
-

@@ -15,6 +15,8 @@ with Device.from_id(5) as device:
         for i, frame in enumerate(stream):
             new = time.monotonic()
             fps, last = 1 / (new - last), new
-            if new - last_update > .1:
-                print(f"frame {i:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps", end='\r')
+            if new - last_update > 0.1:
+                print(
+                    f"frame {i:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps", end="\r"
+                )
                 last_update = new
