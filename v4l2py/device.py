@@ -53,6 +53,7 @@ InputStatus = _enum("InputStatus", "V4L2_IN_ST_", klass=enum.IntFlag)
 InputType = _enum("InputType", "V4L2_INPUT_TYPE_")
 InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFlag)
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
+SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 
 
 def human_pixel_format(ifmt):
@@ -425,23 +426,40 @@ def get_format(fd, buffer_type):
     )
 
 
+def get_parm(fd, buffer_type):
+    p = raw.v4l2_streamparm()
+    p.type = buffer_type
+    ioctl(fd, IOC.G_PARM, p)
+    return p
+
+
 def set_fps(fd, buffer_type, fps):
     # v4l2 fraction is u32
     max_denominator = int(min(2**32, 2**32 / fps))
     p = raw.v4l2_streamparm()
     p.type = buffer_type
     fps = fractions.Fraction(fps).limit_denominator(max_denominator)
-    p.parm.capture.timeperframe.numerator = fps.denominator
-    p.parm.capture.timeperframe.denominator = fps.numerator
+    if buffer_type == BufferType.VIDEO_CAPTURE:
+        p.parm.capture.timeperframe.numerator = fps.denominator
+        p.parm.capture.timeperframe.denominator = fps.numerator
+    elif buffer_type == BufferType.VIDEO_OUTPUT:
+        p.parm.output.timeperframe.numerator = fps.denominator
+        p.parm.output.timeperframe.denominator = fps.numerator
+    else:
+        raise ValueError(f"Unsupported buffer type {buffer_type!r}")
     return ioctl(fd, IOC.S_PARM, p)
 
 
 def get_fps(fd, buffer_type):
-    p = raw.v4l2_streamparm()
-    p.type = buffer_type
-    ioctl(fd, IOC.G_PARM, p)
+    p = get_parm(fd, buffer_type)
+    if buffer_type == BufferType.VIDEO_CAPTURE:
+        parm = p.parm.capture
+    elif buffer_type == BufferType.VIDEO_OUTPUT:
+        parm = p.parm.output
+    else:
+        raise ValueError(f"Unsupported buffer type {buffer_type!r}")
     return fractions.Fraction(
-        p.parm.capture.timeperframe.denominator, p.parm.capture.timeperframe.numerator
+        parm.timeperframe.denominator, parm.timeperframe.numerator
     )
 
 
@@ -472,9 +490,15 @@ def set_selection(fd, buffer_type, rectangles):
     ioctl(fd, IOC.S_SELECTION, sel)
 
 
-def get_selection(fd, buffer_type, max_nb=128):
+def get_selection(
+    fd,
+    buffer_type: BufferType,
+    target: SelectionTarget = SelectionTarget.CROP_DEFAULT,
+    max_nb: int = 128,
+):
     sel = raw.v4l2_selection()
     sel.type = buffer_type
+    sel.target = target
     sel.rectangles = max_nb
     rects = (raw.v4l2_ext_rect * sel.rectangles)()
     sel.pr = ctypes.cast(ctypes.pointer(rects), ctypes.POINTER(raw.v4l2_ext_rect))
@@ -585,10 +609,11 @@ class Device(ReentrantContextManager):
     def __init__(self, filename, read_write=True):
         super().__init__()
         filename = pathlib.Path(filename)
-        self._log = log.getChild(filename.stem)
+        self.log = log.getChild(filename.stem)
         self._read_write = read_write
         self._fobj = None
         self.filename = filename
+        self.index = device_number(filename)
         self.info = None
         self.controls = []
 
@@ -600,24 +625,23 @@ class Device(ReentrantContextManager):
             yield from stream
 
     @classmethod
-    def from_id(cls, did):
+    def from_id(cls, did: int):
         return cls("/dev/video{}".format(did))
 
     def open(self):
         if not self._fobj:
-            self._log.info("opening %s", self.filename)
+            self.log.info("opening %s", self.filename)
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
             self.controls = [Control(self, ctrl) for ctrl in self.info.controls]
-            self._log.info("opened %s (%s)", self.filename, self.info.card)
+            self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
         if not self.closed:
-            self._log.info("closing %s (%s)", self.filename, self.info.card)
+            self.log.info("closing %s (%s)", self.filename, self.info.card)
             self._fobj.close()
             self._fobj = None
-            self.info = None
-            self.controls.clear()
+            self.log.info("closed %s (%s)", self.filename, self.info.card)
 
     def fileno(self):
         return self._fobj.fileno()
@@ -672,14 +696,17 @@ class Device(ReentrantContextManager):
     def set_selection(self, buffer_type, rectangles):
         return set_selection(self.fileno(), buffer_type, rectangles)
 
-    def get_selection(self, buffer_type):
-        return get_selection(self.fileno(), buffer_type)
+    def get_selection(self, buffer_type, target):
+        return get_selection(self.fileno(), buffer_type, target)
 
     def stream_on(self, buffer_type):
         stream_on(self.fileno(), buffer_type)
 
     def stream_off(self, buffer_type):
         stream_off(self.fileno(), buffer_type)
+
+    def write(self, data: bytes) -> None:
+        self._fobj.write(data)
 
 
 class Control:
@@ -712,6 +739,7 @@ class BufferManager(DeviceHelper):
         self.type = buffer_type
         self.size = size
         self.buffers = None
+        self.name = type(self).__name__
 
     def formats(self):
         formats = self.device.info.formats
@@ -763,10 +791,14 @@ class BufferManager(DeviceHelper):
         return self.device.get_selection(self.type)
 
     def stream_on(self):
+        self.device.log.info("Starting %r stream...", self.name)
         self.device.stream_on(self.type)
+        self.device.log.info("%r stream ON", self.name)
 
     def stream_off(self):
+        self.device.log.info("Stopping %r stream...", self.name)
         self.device.stream_off(self.type)
+        self.device.log.info("%r stream OFF", self.name)
 
     start = stream_on
     stop = stream_off
@@ -793,14 +825,18 @@ class VideoCapture(BufferManager):
 
     def open(self):
         if self.buffer is None:
+            self.device.log.info("Preparing for video capture...")
             self.buffer = MemoryMap(self)
             self.buffer.open()
             self.stream_on()
+            self.device.log.info("Video capture started!")
 
     def close(self):
         if self.buffer:
+            self.device.log.info("Closing video capture...")
             self.stream_off()
             self.buffer.close()
+            self.device.log.info("Video capture closed")
 
 
 class MemoryMap(ReentrantContextManager):
@@ -830,17 +866,21 @@ class MemoryMap(ReentrantContextManager):
 
     def open(self):
         if self.buffers is None:
+            self.buffer_manager.device.log.info("Reserving buffers...")
             fd = self.buffer_manager.device.fileno()
             buffers = self.buffer_manager.create_buffers(Memory.MMAP)
             self.buffers = [mmap_from_buffer(fd, buff) for buff in buffers]
             self.buffer_manager.enqueue_buffers(Memory.MMAP)
+            self.buffer_manager.device.log.info("Buffers reserved")
 
     def close(self):
         if self.buffers:
+            self.buffer_manager.device.log.info("Freeing buffers...")
             for mem in self.buffers:
                 mem.close()
             self.buffer_manager.free_buffers(Memory.MMAP)
             self.buffers = None
+            self.buffer_manager.device.log.info("Buffers freed")
 
     def raw_read(self):
         with self.reader as buff:
@@ -866,6 +906,25 @@ class QueueReader:
     def __exit__(self, *exc):
         self.buffer_manager.enqueue_buffer(self.memory, self.index)
         self.index = None
+
+
+class VideoOutput(BufferManager):
+    def __init__(self, device: Device, size: int = 2):
+        super().__init__(device, BufferType.VIDEO_OUTPUT, size)
+        self.buffer = None
+
+    def write(self, data: bytes) -> None:
+        self.device.write(data)
+
+
+def device_number(path):
+    num = ""
+    for c in str(path)[::-1]:
+        if c.isdigit():
+            num = c + num
+        else:
+            break
+    return int(num) if num else None
 
 
 def iter_video_files(path="/dev"):
