@@ -1,0 +1,22 @@
+# set device = control.device
+# set did = device.index
+
+<div class="input-group input-group-sm mb-1" id="{{control.name}}-{{did}}">
+
+    <!--<label for="{{control.name}}-{{did}}" class="form-label">{{control.name}}</label>-->
+    <span class="input-group-text">{{control.name}}</span>
+    <input type="range" class="form-range form-control" 
+        min="{{control.info.minimum}}"
+        max="{{control.info.maximum}}"
+        step="{{control.info.step}}"
+        value="{{control.value}}"
+        name="value"
+        hx-post="/camera/{{did}}/control/{{control.id}}"
+    >
+    <button class="btn btn-outline-secondary" type="button"
+        hx-post="/camera/{{did}}/control/{{control.id}}/reset"
+        hx-target="#{{control.name}}-{{did}}"
+    >
+        Reset
+    </button>
+</div>
