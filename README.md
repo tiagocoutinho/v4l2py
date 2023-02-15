@@ -25,11 +25,11 @@ Without further ado:
 
 ```python
 >>> from v4l2py import Device
->>> cam = Device.from_id(0)
->>> for i, frame in enumerate(cam):
-...     print(f"frame #{i}: {len(frame)} bytes")
-...     if i > 9:
-...         break
+>>> with Device.from_id(0) as cam:
+>>>     for i, frame in enumerate(cam):
+...         print(f"frame #{i}: {len(frame)} bytes")
+...         if i > 9:
+...             break
 ...
 frame #0: 54630 bytes
 frame #1: 50184 bytes
@@ -50,7 +50,7 @@ Getting information about the device:
 >>> from v4l2py import Device
 
 >>> cam = Device.from_id(0)
-
+>>> cam.open()
 >>> cam.info.card
 'Integrated_Webcam_HD: Integrate'
 
@@ -65,6 +65,17 @@ Getting information about the device:
 
 >>> cam.video_capture.get_format()
 Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
+
+>>> for ctrl in cam.controls.values(): print(ctrl)
+<Control name=Brightness, type=INTEGER, min=0, max=255, step=1>
+<Control name=Contrast, type=INTEGER, min=0, max=255, step=1>
+<Control name=Saturation, type=INTEGER, min=0, max=100, step=1>
+<Control name=Hue, type=INTEGER, min=-180, max=180, step=1>
+<Control name=Gamma, type=INTEGER, min=90, max=150, step=1>
+<Control name=White Balance Temperature, type=INTEGER, min=2800, max=6500, step=1>
+<Control name=Sharpness, type=INTEGER, min=0, max=7, step=1>
+<Control name=Backlight Compensation, type=INTEGER, min=0, max=2, step=1>
+<Control name=Exposure (Absolute), type=INTEGER, min=4, max=1250, step=1>
 ```
 
 
