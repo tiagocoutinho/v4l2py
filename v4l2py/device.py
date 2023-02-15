@@ -852,7 +852,6 @@ class MemoryMap(ReentrantContextManager):
         loop.add_reader(device.fileno(), event.set)
         try:
             while True:
-                select.select((device,), (), ())
                 await event.wait()
                 event.clear()
                 yield self.raw_read()
