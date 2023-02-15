@@ -803,6 +803,9 @@ class BufferManager(DeviceHelper):
     start = stream_on
     stop = stream_off
 
+    def write(self, data: bytes) -> None:
+        self.device.write(data)
+
 
 class VideoCapture(BufferManager):
     def __init__(self, device: Device, size: int = 2):
@@ -912,9 +915,6 @@ class VideoOutput(BufferManager):
     def __init__(self, device: Device, size: int = 2):
         super().__init__(device, BufferType.VIDEO_OUTPUT, size)
         self.buffer = None
-
-    def write(self, data: bytes) -> None:
-        self.device.write(data)
 
 
 def device_number(path):
