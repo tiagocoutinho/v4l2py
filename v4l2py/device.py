@@ -53,6 +53,7 @@ InputStatus = _enum("InputStatus", "V4L2_IN_ST_", klass=enum.IntFlag)
 InputType = _enum("InputType", "V4L2_INPUT_TYPE_")
 InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFlag)
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
+ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 
 
@@ -276,14 +277,14 @@ def iter_read_inputs(fd):
 
 def iter_read_controls(fd):
     ctrl_ext = raw.v4l2_query_ext_ctrl()
-    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL  | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
     ctrl_ext.id = nxt
     for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
         if not (ctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (
             ctrl_ext.type & raw.V4L2_CTRL_TYPE_CTRL_CLASS
         ):
             yield copy.deepcopy(ctrl_ext)
-        ctrl_ext.id |= raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+        ctrl_ext.id |= nxt
 
 
 def read_info(fd):
@@ -530,17 +531,6 @@ def set_control(fd, id, value):
     ioctl(fd, IOC.S_CTRL, control)
 
 
-def get_controls(fd, id):
-    control = raw.v4l2_control(id)
-    ioctl(fd, IOC.G_CTRL, control)
-    return control.value
-
-
-def set_controls(fd, id, value):
-    control = raw.v4l2_control(id, value)
-    ioctl(fd, IOC.S_CTRL, control)
-
-
 def fopen(path, rw=False):
     return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
 
@@ -615,7 +605,7 @@ class Device(ReentrantContextManager):
         self.filename = filename
         self.index = device_number(filename)
         self.info = None
-        self.controls = []
+        self.controls = {}
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
@@ -633,7 +623,7 @@ class Device(ReentrantContextManager):
             self.log.info("opening %s", self.filename)
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
-            self.controls = [Control(self, ctrl) for ctrl in self.info.controls]
+            self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
@@ -713,18 +703,20 @@ class Control:
     def __init__(self, device, info):
         self.device = device
         self.info = info
+        self.id = self.info.id
         self.name = info.name.decode()
+        self.type = ControlType(self.info.type)
 
     def __repr__(self):
-        return f"<{type(self).__name__} name={self.name}>"
+        return f"<{type(self).__name__} name={self.name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
 
     @property
     def value(self):
-        return get_control(self.device, self.info.id)
+        return get_control(self.device, self.id)
 
     @value.setter
     def value(self, value):
-        return set_control(self.device, self.info.id, value)
+        return set_control(self.device, self.id, value)
 
 
 class DeviceHelper:
