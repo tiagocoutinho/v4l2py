@@ -1,0 +1,23 @@
+# set index = camera.device.index
+# set name = camera.device.info.card
+<div class="card">
+    <h5 class="card-header">{{index}} - {{name}}</h5>
+    <div class="row g-0">
+        <div class="col-md-12 col-lg-8 col-xl-6">
+            <div id="stream-{{ index }}">
+                <img src="static/cross.png" alt="no video">
+            </div>
+        </div>
+        <div class="col-md-12 col-lg-4">
+            <div class="card-body">
+                # for control in camera.device.controls.values():
+                # include "control.html"
+                # endfor
+                <button type="button" class="btn btn-primary" hx-post="/camera/{{index}}/start" hx-target="#stream-{{index}}">Start</button>
+                <button type="button" class="btn btn-danger" hx-post="/camera/{{index}}/stop" hx-target="#stream-{{index}}">Stop</button> 
+            </div>
+        </div>
+    </div>
+
+    </div>
+</div>

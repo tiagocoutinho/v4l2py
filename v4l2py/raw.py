@@ -6,7 +6,6 @@
 
 import ctypes
 
-
 _IOC_NRBITS = 8
 _IOC_TYPEBITS = 8
 _IOC_SIZEBITS = 14
@@ -266,6 +265,13 @@ class v4l2_rect(ctypes.Structure):
     ]
 
 
+class v4l2_ext_rect(ctypes.Structure):
+    _fields_ = [
+        ("r", v4l2_rect),
+        ("reserved", ctypes.c_int32 * 4),
+    ]
+
+
 class v4l2_fract(ctypes.Structure):
     _fields_ = [
         ("numerator", ctypes.c_uint32),
@@ -410,8 +416,21 @@ V4L2_PIX_FMT_MJPEG = v4l2_fourcc("M", "J", "P", "G")
 V4L2_PIX_FMT_JPEG = v4l2_fourcc("J", "P", "E", "G")
 V4L2_PIX_FMT_DV = v4l2_fourcc("d", "v", "s", "d")
 V4L2_PIX_FMT_MPEG = v4l2_fourcc("M", "P", "E", "G")
+V4L2_PIX_FMT_MPG1 = v4l2_fourcc("M", "P", "G", "1")
+V4L2_PIX_FMT_MPG2 = v4l2_fourcc("M", "P", "G", "2")
+V4L2_PIX_FMT_MPEG2_SLICE = v4l2_fourcc("M", "G", "2", "S")
+V4L2_PIX_FMT_MPG4 = v4l2_fourcc("M", "P", "G", "4")
+V4L2_PIX_FMT_H263 = v4l2_fourcc("H", "2", "6", "3")
 V4L2_PIX_FMT_H264 = v4l2_fourcc("H", "2", "6", "4")
+V4L2_PIX_FMT_H264_NO_SC = v4l2_fourcc("A", "V", "C", "1")
+V4L2_PIX_FMT_H264_MVC = v4l2_fourcc("M", "2", "6", "4")
 V4L2_PIX_FMT_H265 = v4l2_fourcc("H", "2", "6", "5")
+V4L2_PIX_FMT_XVID = v4l2_fourcc("X", "V", "I", "D")
+V4L2_PIX_FMT_VC1_ANNEX_G = v4l2_fourcc("V", "C", "1", "G")
+V4L2_PIX_FMT_VC1_ANNEX_L = v4l2_fourcc("V", "C", "1", "L")
+V4L2_PIX_FMT_VP8 = v4l2_fourcc("V", "P", "8", "0")
+V4L2_PIX_FMT_HEVC = v4l2_fourcc("H", "E", "V", "C")
+V4L2_PIX_FMT_FWHT = v4l2_fourcc("F", "W", "H", "T")
 
 # Vendor-specific formats
 V4L2_PIX_FMT_CPIA1 = v4l2_fourcc("C", "P", "I", "A")
@@ -609,8 +628,8 @@ class v4l2_requestbuffers(ctypes.Structure):
 class v4l2_buffer(ctypes.Structure):
     class _u(ctypes.Union):
         _fields_ = [
-            ("offset", ctypes.c_uint32),
-            ("userptr", ctypes.c_ulong),
+            ("offset", ctypes.c_uint32),  # V4L2_MEMORY_MMAP
+            ("userptr", ctypes.c_ulong),  # V4L2_MEMORY_USERPTR
         ]
 
     _fields_ = [
@@ -743,6 +762,42 @@ class v4l2_crop(ctypes.Structure):
     _fields_ = [
         ("type", ctypes.c_int),
         ("c", v4l2_rect),
+    ]
+
+
+# Selection interface definitions from 'v4l2-common.h'
+
+# Selection TARGET
+V4L2_SEL_TGT_CROP = 0x0000
+V4L2_SEL_TGT_CROP_DEFAULT = 0x0001
+V4L2_SEL_TGT_CROP_BOUNDS = 0x0002
+V4L2_SEL_TGT_NATIVE_SIZE = 0x0003
+V4L2_SEL_TGT_COMPOSE = 0x0100
+V4L2_SEL_TGT_COMPOSE_DEFAULT = 0x0101
+V4L2_SEL_TGT_COMPOSE_BOUNDS = 0x0102
+V4L2_SEL_TGT_COMPOSE_PADDED = 0x0103
+
+# Selection flags
+V4L2_SEL_FLAG_GE = 1 << 0
+V4L2_SEL_FLAG_LE = 1 << 1
+V4L2_SEL_FLAG_KEEP_CONFIG = 1 << 2
+
+
+class v4l2_selection(ctypes.Structure):
+    class _u(ctypes.Union):
+        _fields_ = [
+            ("reserved", ctypes.c_uint32 * 8),
+            ("pr", ctypes.POINTER(v4l2_ext_rect)),
+        ]
+
+    _anonymous_ = ("u",)
+    _fields_ = [
+        ("type", v4l2_buf_type),
+        ("target", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("r", v4l2_rect),
+        ("rectangles", ctypes.c_uint32),
+        ("u", _u),
     ]
 
 
@@ -945,12 +1000,14 @@ class v4l2_input(ctypes.Structure):
         ("tuner", ctypes.c_uint32),
         ("std", v4l2_std_id),
         ("status", ctypes.c_uint32),
-        ("reserved", ctypes.c_uint32 * 4),
+        ("capabilities", ctypes.c_uint32),
+        ("reserved", ctypes.c_uint32 * 3),
     ]
 
 
 V4L2_INPUT_TYPE_TUNER = 1
 V4L2_INPUT_TYPE_CAMERA = 2
+V4L2_INPUT_TYPE_TOUCH = 3
 
 V4L2_IN_ST_NO_POWER = 0x00000001
 V4L2_IN_ST_NO_SIGNAL = 0x00000002
@@ -973,6 +1030,7 @@ V4L2_IN_ST_VTR = 0x04000000
 V4L2_IN_CAP_PRESETS = 0x00000001
 V4L2_IN_CAP_CUSTOM_TIMINGS = 0x00000002
 V4L2_IN_CAP_STD = 0x00000004
+V4L2_IN_CAP_NATIVE_SIZE = 0x00000008
 
 #
 # Video outputs
@@ -1023,14 +1081,15 @@ class v4l2_ext_control(ctypes.Structure):
             ("reserved", ctypes.c_void_p),
         ]
 
-    _anonymous_ = ("_u",)
-    _pack_ = True
     _fields_ = [
         ("id", ctypes.c_uint32),
         ("size", ctypes.c_uint32),
-        ("reserved2", ctypes.c_uint32 * 1),
-        ("_u", _u)
+        ("reserved2", ctypes.c_uint32 * 2),
+        ("_u", _u),
     ]
+
+    _anonymous_ = ("_u",)
+    _pack_ = True
 
 
 class v4l2_ext_controls(ctypes.Structure):
@@ -1069,9 +1128,6 @@ def V4L2_CTRL_DRIVER_PRIV(id_):
     return (id_ & 0xFFFF) >= 0x1000
 
 
-V4L2_CTRL_MAX_DIMS = 4
-
-
 class v4l2_queryctrl(ctypes.Structure):
     _fields_ = [
         ("id", ctypes.c_uint32),
@@ -1084,6 +1140,10 @@ class v4l2_queryctrl(ctypes.Structure):
         ("flags", ctypes.c_uint32),
         ("reserved", ctypes.c_uint32 * 2),
     ]
+
+
+V4L2_CTRL_MAX_DIMS = 4
+
 
 class v4l2_query_ext_ctrl(ctypes.Structure):
     _fields_ = [
@@ -1101,6 +1161,7 @@ class v4l2_query_ext_ctrl(ctypes.Structure):
         ("dims", ctypes.c_uint32 * V4L2_CTRL_MAX_DIMS),
         ("reserved", ctypes.c_uint32 * 32),
     ]
+
 
 class v4l2_querymenu(ctypes.Structure):
     _fields_ = [
@@ -2014,7 +2075,8 @@ VIDIOC_QUERY_DV_PRESET = _IOR("V", 86, v4l2_dv_preset)
 VIDIOC_S_DV_TIMINGS = _IOWR("V", 87, v4l2_dv_timings)
 VIDIOC_G_DV_TIMINGS = _IOWR("V", 88, v4l2_dv_timings)
 
-VIDIOC_QUERY_EXT_CTRL = _IOWR("V", 103, v4l2_query_ext_ctrl)
+VIDIOC_G_SELECTION = _IOWR("V", 94, v4l2_selection)
+VIDIOC_S_SELECTION = _IOWR("V", 95, v4l2_selection)
 
 VIDIOC_OVERLAY_OLD = _IOWR("V", 14, ctypes.c_int)
 VIDIOC_S_PARM_OLD = _IOW("V", 22, v4l2_streamparm)
@@ -2022,5 +2084,7 @@ VIDIOC_S_CTRL_OLD = _IOW("V", 28, v4l2_control)
 VIDIOC_G_AUDIO_OLD = _IOWR("V", 33, v4l2_audio)
 VIDIOC_G_AUDOUT_OLD = _IOWR("V", 49, v4l2_audioout)
 VIDIOC_CROPCAP_OLD = _IOR("V", 58, v4l2_cropcap)
+
+VIDIOC_QUERY_EXT_CTRL = _IOWR("V", 103, v4l2_query_ext_ctrl)
 
 BASE_VIDIOC_PRIVATE = 192
