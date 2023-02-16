@@ -18,17 +18,17 @@ SUFFIX = b"\r\n"
 
 
 def gen_frames():
-    with next(iter_video_capture_devices()) as device:
+    with Device.from_id(1) as device:
         for frame in device:
             yield b"".join((PREFIX, frame, SUFFIX))
 
 
-@app.route("/")
+@app.get("/")
 def index():
     return '<html><img src="/stream" /></html>'
 
 
-@app.route("/stream")
+@app.get("/stream")
 def stream():
     return flask.Response(
         gen_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
