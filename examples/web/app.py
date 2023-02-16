@@ -33,6 +33,8 @@ logging.basicConfig(
     format="%(threadName)-10s %(asctime)-15s %(levelname)-5s %(name)s: %(message)s",
 )
 
+log = logging.getLogger(__name__)
+
 
 BOUNDARY = "frame"
 HEADER = (
@@ -69,7 +71,7 @@ class Trigger:
         for ident, event in self.events.items():
             if event[0].is_set():
                 if now - event[1] > 5:
-                    logging.info("Removing inactive client...")
+                    log.info("Removing inactive client...")
                     remove.append(ident)
             else:
                 event[0].set()
@@ -127,10 +129,10 @@ class Camera:
             for i, data in enumerate(self.device):
                 self.last_frame = to_frame(data)
                 if not i % 100:
-                    self.device.log.info(f"frame {i:04d} (raw={len(data) / 1000:.1f} kb; {self.frame_type}={len(self.last_frame) / 1000:.1f} kb)")
+                    log.info(f"frame {i:04d} (raw={len(data) / 1000:.1f} kb; {self.frame_type}={len(self.last_frame) / 1000:.1f} kb)")
                 self.trigger.set()
                 if gevent.time.monotonic() - self.last_request > 10:
-                    self.device.log.info("Stopping camera task due to inactivity")
+                    log.info("Stopping camera task due to inactivity")
                     break
 
 
