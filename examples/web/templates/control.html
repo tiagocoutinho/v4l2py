@@ -15,7 +15,7 @@
     >
     <button class="btn btn-outline-secondary" type="button"
         hx-post="/camera/{{did}}/control/{{control.id}}/reset"
-        hx-target="#{{control.name}}-{{did}}"
+        hx-target="#{{control.name}}-{{did}}" hx-swap="outerHTML"
     >
         Reset
     </button>
