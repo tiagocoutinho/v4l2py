@@ -4,7 +4,7 @@
 # Copyright (c) 2023 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-# run from this directory with: 
+# run from this directory with:
 # gunicorn --bind=0.0.0.0:8000 --log-level=debug --worker-class=gevent app:app
 
 import functools
@@ -17,13 +17,17 @@ import gevent.event
 import gevent.monkey
 import gevent.queue
 import gevent.time
-
 from PIL import Image
-import pillow_avif
+
+from v4l2py.device import (
+    Device,
+    Format,
+    PixelFormat,
+    VideoCapture,
+    iter_video_capture_devices,
+)
 
 gevent.monkey.patch_all()
-
-from v4l2py.device import Device, VideoCapture, Format, PixelFormat, iter_video_capture_devices
 
 app = flask.Flask("basic-web-cam")
 app.jinja_env.line_statement_prefix = "#"
@@ -85,7 +89,7 @@ class Trigger:
 
 
 class Camera:
-    def __init__(self, device: Device, frame_type='jpeg') -> None:
+    def __init__(self, device: Device, frame_type="jpeg") -> None:
         self.device: Device = device
         self.runner: gevent.Greenlet | None = None
         self.last_frame: bytes | None = None
@@ -125,11 +129,8 @@ class Camera:
             format = capture.get_format()
             to_frame = buffer_to_frame_maker(format, output=self.frame_type)
             self.last_request = gevent.time.monotonic()
-            buff = io.BytesIO()
             for i, data in enumerate(self.device):
                 self.last_frame = to_frame(data)
-                if not i % 100:
-                    log.info(f"frame {i:04d} (raw={len(data) / 1000:.1f} kb; {self.frame_type}={len(self.last_frame) / 1000:.1f} kb)")
                 self.trigger.set()
                 if gevent.time.monotonic() - self.last_request > 10:
                     log.info("Stopping camera task due to inactivity")
@@ -149,16 +150,15 @@ def cameras() -> list[Camera]:
     return CAMERAS
 
 
-def buffer_to_frame_maker(format: Format, output='avif'):
+def buffer_to_frame_maker(format: Format, output="jpeg"):
     match (format.pixel_format, output.lower()):
-        case [PixelFormat.JPEG | PixelFormat.MJPEG, 'jpeg']:
-            return functools.partial(to_frame, type='jpeg')
-        case _:            
+        case (PixelFormat.JPEG | PixelFormat.MJPEG, "jpeg"):
+            return functools.partial(to_frame, type="jpeg")
+        case _:
             return functools.partial(buffer_to_frame, format=format, output=output)
 
 
-def buffer_to_frame(data: bytes, format: Format, output='jpeg'):
-    from PIL import Image
+def buffer_to_frame(data: bytes, format: Format, output="jpeg"):
     match format.pixel_format:
         case PixelFormat.JPEG | PixelFormat.MJPEG:
             image = Image.open(io.BytesIO(data))
@@ -171,7 +171,7 @@ def buffer_to_frame(data: bytes, format: Format, output='jpeg'):
     return to_frame(buff.getvalue(), type=output)
 
 
-def to_frame(data, type='avif', boundary=BOUNDARY):
+def to_frame(data, type="avif", boundary=BOUNDARY):
     header = HEADER.format(type=type, boundary=boundary, length=len(data)).encode()
     return b"".join((header, data, SUFFIX))
 
@@ -227,6 +227,7 @@ def reset_control(device_id, control_id):
         control = camera.device.controls[control_id]
         control.value = control.info.default_value
     return flask.render_template("control.html", control=control)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0")

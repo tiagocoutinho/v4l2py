@@ -277,7 +277,7 @@ def iter_read_inputs(fd):
 
 def iter_read_controls(fd):
     ctrl_ext = raw.v4l2_query_ext_ctrl()
-    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL  | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
     ctrl_ext.id = nxt
     for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
         if not (ctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (
@@ -413,13 +413,19 @@ def set_format(fd, buffer_type, width, height, pixel_format="MJPG"):
     f.fmt.pix.width = width
     f.fmt.pix.height = height
     f.fmt.pix.bytesperline = 0
+    f.fmt.pix.sizeimage = 0
     return ioctl(fd, IOC.S_FMT, f)
 
 
+def get_raw_format(fd, buffer_type):
+    fmt = raw.v4l2_format()
+    fmt.type = buffer_type
+    ioctl(fd, IOC.G_FMT, fmt)
+    return fmt
+
+
 def get_format(fd, buffer_type):
-    f = raw.v4l2_format()
-    f.type = buffer_type
-    ioctl(fd, IOC.G_FMT, f)
+    f = get_raw_format(fd, buffer_type)
     return Format(
         width=f.fmt.pix.width,
         height=f.fmt.pix.height,
@@ -623,7 +629,9 @@ class Device(ReentrantContextManager):
             self.log.info("opening %s", self.filename)
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
-            self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
+            self.controls = {
+                ctrl.id: Control(self, ctrl) for ctrl in self.info.controls
+            }
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
@@ -671,7 +679,7 @@ class Device(ReentrantContextManager):
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
         return set_format(
-            self.fileno(), buffer_type, width, height, pixel_format="MJPG"
+            self.fileno(), buffer_type, width, height, pixel_format=pixel_format
         )
 
     def get_format(self, buffer_type):
