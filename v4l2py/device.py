@@ -277,7 +277,7 @@ def iter_read_inputs(fd):
 
 def iter_read_controls(fd):
     ctrl_ext = raw.v4l2_query_ext_ctrl()
-    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL  | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
     ctrl_ext.id = nxt
     for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
         if not (ctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (
@@ -623,7 +623,9 @@ class Device(ReentrantContextManager):
             self.log.info("opening %s", self.filename)
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
-            self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
+            self.controls = {
+                ctrl.id: Control(self, ctrl) for ctrl in self.info.controls
+            }
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
