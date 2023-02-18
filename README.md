@@ -1,5 +1,9 @@
 # v4l2py
 
+[![V4L2py][pypi-version]](https://pypi.python.org/pypi/v4l2py)
+[![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/v4l2py)
+![License][license]
+
 Video for linux 2 (V4L2) python library
 
 A two purpose API:
@@ -127,3 +131,8 @@ See the ``linux/videodev2.h`` header file for details.
 
 
 * `Video for Linux Two Specification <http://linuxtv.org/downloads/v4l-dvb-apis/ch07s02.html>`
+
+[pypi-python-versions]: https://img.shields.io/pypi/pyversions/v4l2py.svg
+[pypi-version]: https://img.shields.io/pypi/v/v4l2py.svg
+[pypi-status]: https://img.shields.io/pypi/status/v4l2py.svg
+[license]: https://img.shields.io/pypi/l/v4l2py.svg
