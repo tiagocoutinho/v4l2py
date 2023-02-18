@@ -698,10 +698,14 @@ class Device(ReentrantContextManager):
         return get_selection(self.fileno(), buffer_type, target)
 
     def stream_on(self, buffer_type):
+        self.log.info("Starting %r stream...", buffer_type.name)
         stream_on(self.fileno(), buffer_type)
+        self.log.info("%r stream ON", buffer_type.name)
 
     def stream_off(self, buffer_type):
+        self.log.info("Stoping %r stream...", buffer_type.name)
         stream_off(self.fileno(), buffer_type)
+        self.log.info("%r stream OFF", buffer_type.name)
 
     def write(self, data: bytes) -> None:
         self._fobj.write(data)
@@ -791,14 +795,10 @@ class BufferManager(DeviceHelper):
         return self.device.get_selection(self.type)
 
     def stream_on(self):
-        self.device.log.info("Starting %r stream...", self.name)
         self.device.stream_on(self.type)
-        self.device.log.info("%r stream ON", self.name)
 
     def stream_off(self):
-        self.device.log.info("Stopping %r stream...", self.name)
         self.device.stream_off(self.type)
-        self.device.log.info("%r stream OFF", self.name)
 
     start = stream_on
     stop = stream_off
