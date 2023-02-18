@@ -15,7 +15,7 @@ with open("README.md") as f:
 
 setup(
     name="v4l2py",
-    version="1.0.0",
+    version="1.0.1",
     author="Jose Tiago Macara Coutinho",
     author_email="coutinhotiago@gmail.com",
     license="GPLv3",
@@ -41,6 +41,6 @@ setup(
     url="http://pypi.python.org/pypi/v4l2py",
     project_urls={
         "Documentation": "https://github.com/tiagocoutinho/v4l2py",
-        "Source": "https://github.com/tiagocoutinho/v4l2py"
-    }
+        "Source": "https://github.com/tiagocoutinho/v4l2py",
+    },
 )
