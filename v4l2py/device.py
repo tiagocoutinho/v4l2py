@@ -413,13 +413,19 @@ def set_format(fd, buffer_type, width, height, pixel_format="MJPG"):
     f.fmt.pix.width = width
     f.fmt.pix.height = height
     f.fmt.pix.bytesperline = 0
+    f.fmt.pix.sizeimage = 0
     return ioctl(fd, IOC.S_FMT, f)
 
 
+def get_raw_format(fd, buffer_type):
+    fmt = raw.v4l2_format()
+    fmt.type = buffer_type
+    ioctl(fd, IOC.G_FMT, fmt)
+    return fmt
+
+
 def get_format(fd, buffer_type):
-    f = raw.v4l2_format()
-    f.type = buffer_type
-    ioctl(fd, IOC.G_FMT, f)
+    f = get_raw_format(fd, buffer_type)
     return Format(
         width=f.fmt.pix.width,
         height=f.fmt.pix.height,
@@ -673,7 +679,7 @@ class Device(ReentrantContextManager):
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
         return set_format(
-            self.fileno(), buffer_type, width, height, pixel_format="MJPG"
+            self.fileno(), buffer_type, width, height, pixel_format=pixel_format
         )
 
     def get_format(self, buffer_type):
