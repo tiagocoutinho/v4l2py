@@ -614,6 +614,11 @@ class Device(ReentrantContextManager):
         with VideoCapture(self) as stream:
             yield from stream
 
+    async def __aiter__(self):
+        with VideoCapture(self) as stream:
+            async for frame in stream:
+                yield frame
+
     @classmethod
     def from_id(cls, did: int):
         return cls("/dev/video{}".format(did))
