@@ -82,6 +82,23 @@ Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 <Control name=Exposure (Absolute), type=INTEGER, min=4, max=1250, step=1>
 ```
 
+### asyncio
+
+v4l2py is asyncio friendly:
+
+```bash
+$ python -m asyncio
+
+>>> from v4l2py import Device
+>>> with Device.from_id(0) as camera:
+...     async for frame in camera:
+...         print(f"frame {len(frame)}")
+frame 10224
+frame 10304
+frame 10224
+frame 10136
+...
+```
 
 ## Bonus track
 

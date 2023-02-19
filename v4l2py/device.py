@@ -14,9 +14,7 @@ import fcntl
 import fractions
 import logging
 import mmap
-import os
 import pathlib
-import select
 
 from . import raw
 
@@ -538,11 +536,7 @@ def set_control(fd, id, value):
 
 
 def fopen(path, rw=False):
-    return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
-
-
-def opener(path, flags):
-    return os.open(path, flags | os.O_NONBLOCK)
+    return open(path, "rb+" if rw else "rb", buffering=0)
 
 
 # Helpers
@@ -619,6 +613,11 @@ class Device(ReentrantContextManager):
     def __iter__(self):
         with VideoCapture(self) as stream:
             yield from stream
+
+    async def __aiter__(self):
+        with VideoCapture(self) as stream:
+            async for frame in stream:
+                yield frame
 
     @classmethod
     def from_id(cls, did: int):
@@ -889,7 +888,9 @@ class MemoryMap(ReentrantContextManager):
             return self.buffers[buff.index][: buff.bytesused]
 
     def read(self):
-        select.select((self.buffer_manager.device,), (), ())
+        # file was NOT opened with O_NONBLOCK: DQBUF will block until a buffer is
+        # available for read. If we want to multplex we can call select.select()
+        # before calling read
         return self.raw_read()
 
 
