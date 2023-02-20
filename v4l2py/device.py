@@ -53,6 +53,7 @@ InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFla
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
 ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
+Priority = _enum("Priority", "V4L2_PRIORITY_")
 
 
 def human_pixel_format(ifmt):
@@ -535,6 +536,17 @@ def set_control(fd, id, value):
     ioctl(fd, IOC.S_CTRL, control)
 
 
+def get_priority(fd) -> Priority:
+    priority = raw.enum()
+    ioctl(fd, IOC.G_PRIORITY, priority)
+    return Priority(priority.value)
+
+
+def set_priority(fd, priority: Priority):
+    priority = raw.enum(priority.value)
+    ioctl(fd, IOC.S_PRIORITY, priority)
+
+
 def fopen(path, rw=False):
     return open(path, "rb+" if rw else "rb", buffering=0)
 
@@ -695,6 +707,12 @@ class Device(ReentrantContextManager):
 
     def get_selection(self, buffer_type, target):
         return get_selection(self.fileno(), buffer_type, target)
+
+    def get_priority(self) -> Priority:
+        return get_priority(self.fileno())
+
+    def set_priority(self, priority: Priority):
+        set_priority(self.fileno(), priority)
 
     def stream_on(self, buffer_type):
         self.log.info("Starting %r stream...", buffer_type.name)
