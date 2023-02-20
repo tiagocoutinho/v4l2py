@@ -573,12 +573,6 @@ def create_mmap_buffer(fd, buffer_type: BufferType, memory: Memory) -> mmap.mmap
     return create_mmap_buffers(fd, buffer_type, memory, 1)
 
 
-def enqueue_buffers(
-    fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[raw.v4l2_buffer]:
-    return [enqueue_buffer(fd, buffer_type, memory, index) for index in range(count)]
-
-
 class ReentrantContextManager:
     def __init__(self):
         self._context_level = 0
@@ -596,6 +590,17 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
+
+    def __new__(cls, *args, **kwargs):
+        # create a new object
+        obj = super().__new__(cls)
+        # init factories
+        obj.Control = Control
+        obj.MemoryMap = MemoryMap
+        obj.QueueReader = QueueReader
+        obj.VideoCapture = VideoCapture
+        return obj
+
     def __init__(self, filename, read_write=True):
         super().__init__()
         filename = pathlib.Path(filename)
@@ -611,11 +616,11 @@ class Device(ReentrantContextManager):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
 
     def __iter__(self):
-        with VideoCapture(self) as stream:
+        with self.VideoCapture(self) as stream:
             yield from stream
 
     async def __aiter__(self):
-        with VideoCapture(self) as stream:
+        with self.VideoCapture(self) as stream:
             async for frame in stream:
                 yield frame
 
@@ -629,7 +634,7 @@ class Device(ReentrantContextManager):
             self._fobj = fopen(self.filename, self._read_write)
             self.info = read_info(self.fileno())
             self.controls = {
-                ctrl.id: Control(self, ctrl) for ctrl in self.info.controls
+                ctrl.id: self.Control(self, ctrl) for ctrl in self.info.controls
             }
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
@@ -647,7 +652,7 @@ class Device(ReentrantContextManager):
     def closed(self):
         return self._fobj is None or self._fobj.closed
 
-    def query_buffer(self, buffer_type, memory, index):
+    def query_buffer(self, buffer_type: BufferType, memory: Memory, index: int):
         return query_buffer(self.fileno(), buffer_type, memory, index)
 
     def enqueue_buffer(
@@ -674,7 +679,7 @@ class Device(ReentrantContextManager):
     def enqueue_buffers(
         self, buffer_type: BufferType, memory: Memory, count: int
     ) -> list[raw.v4l2_buffer]:
-        return enqueue_buffers(self.fileno(), buffer_type, memory, count)
+        return [self.enqueue_buffer(buffer_type, memory, index) for index in range(count)]
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
         return set_format(
@@ -828,7 +833,7 @@ class VideoCapture(BufferManager):
     def open(self):
         if self.buffer is None:
             self.device.log.info("Preparing for video capture...")
-            self.buffer = MemoryMap(self)
+            self.buffer = self.device.MemoryMap(self)
             self.buffer.open()
             self.stream_on()
             self.device.log.info("Video capture started!")
@@ -846,7 +851,7 @@ class MemoryMap(ReentrantContextManager):
         super().__init__()
         self.buffer_manager = buffer_manager
         self.buffers = None
-        self.reader = QueueReader(buffer_manager, Memory.MMAP)
+        self.reader = self.buffer_manager.device.QueueReader(buffer_manager, Memory.MMAP)
 
     def __iter__(self):
         while True:
