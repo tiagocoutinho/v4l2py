@@ -9,7 +9,7 @@ from tkinter import READABLE, Canvas, Tk
 
 from PIL import Image, ImageTk
 
-from v4l2py import Device
+from v4l2py import Device, VideoCapture
 
 
 def frame():
@@ -22,8 +22,9 @@ def update(cam, mask=None):
 
 
 with Device.from_id(0) as cam:
-    fmt = cam.video_capture.get_format()
-    cam.video_capture.set_format(fmt.width, fmt.height, "MJPG")
+    video_capture = VideoCapture(cam)
+    fmt = video_capture.get_format()
+    video_capture.set_format(fmt.width, fmt.height, "MJPG")
     stream = iter(cam)
     window = Tk()
     window.title("Join")
