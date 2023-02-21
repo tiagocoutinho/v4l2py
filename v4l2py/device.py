@@ -879,7 +879,7 @@ class MemoryMap(ReentrantContextManager):
             while True:
                 await event.wait()
                 event.clear()
-                yield self.raw_read()
+                yield self.read()
         finally:
             loop.remove_reader(device.fileno())
 
@@ -901,15 +901,12 @@ class MemoryMap(ReentrantContextManager):
             self.buffers = None
             self.buffer_manager.device.log.info("Buffers freed")
 
-    def raw_read(self):
-        with self.reader as buff:
-            return self.buffers[buff.index][: buff.bytesused]
-
     def read(self):
         # file was NOT opened with O_NONBLOCK: DQBUF will block until a buffer is
         # available for read. If we want to multplex we can call select.select()
         # before calling read
-        return self.raw_read()
+        with self.reader as buff:
+            return self.buffers[buff.index][: buff.bytesused]
 
 
 class QueueReader:
