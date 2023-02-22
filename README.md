@@ -3,6 +3,7 @@
 [![V4L2py][pypi-version]](https://pypi.python.org/pypi/v4l2py)
 [![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/v4l2py)
 ![License][license]
+[![CI][CI]](https://github.com/tiagocoutinho/v4l2py/actions/workflows/ci.yml)
 
 Video for linux 2 (V4L2) python library
 
@@ -153,3 +154,4 @@ See the ``linux/videodev2.h`` header file for details.
 [pypi-version]: https://img.shields.io/pypi/v/v4l2py.svg
 [pypi-status]: https://img.shields.io/pypi/status/v4l2py.svg
 [license]: https://img.shields.io/pypi/l/v4l2py.svg
+[CI]: https://github.com/tiagocoutinho/v4l2py/actions/workflows/ci.yml/badge.svg
