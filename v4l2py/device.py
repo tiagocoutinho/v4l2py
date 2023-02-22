@@ -15,6 +15,7 @@ import fractions
 import logging
 import mmap
 import pathlib
+import typing
 
 from . import raw
 
@@ -561,7 +562,7 @@ def create_buffer(fd, buffer_type: BufferType, memory: Memory) -> raw.v4l2_buffe
 
 def create_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[raw.v4l2_buffer]:
+) -> typing.List[raw.v4l2_buffer]:
     """request + query buffers"""
     request_buffers(fd, buffer_type, memory, count)
     return [query_buffer(fd, buffer_type, memory, index) for index in range(count)]
@@ -573,7 +574,7 @@ def mmap_from_buffer(fd, buff: raw.v4l2_buffer) -> mmap.mmap:
 
 def create_mmap_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[mmap.mmap]:
+) -> typing.List[mmap.mmap]:
     """create buffers + mmap_from_buffer"""
     return [
         mmap_from_buffer(fd, buff)
@@ -587,7 +588,7 @@ def create_mmap_buffer(fd, buffer_type: BufferType, memory: Memory) -> mmap.mmap
 
 def enqueue_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[raw.v4l2_buffer]:
+) -> typing.List[raw.v4l2_buffer]:
     return [enqueue_buffer(fd, buffer_type, memory, index) for index in range(count)]
 
 
@@ -677,7 +678,7 @@ class Device(ReentrantContextManager):
 
     def create_buffers(
         self, buffer_type: BufferType, memory: Memory, count: int
-    ) -> list[raw.v4l2_buffer]:
+    ) -> typing.List[raw.v4l2_buffer]:
         return create_buffers(self.fileno(), buffer_type, memory, count)
 
     def free_buffers(self, buffer_type, memory):
@@ -685,7 +686,7 @@ class Device(ReentrantContextManager):
 
     def enqueue_buffers(
         self, buffer_type: BufferType, memory: Memory, count: int
-    ) -> list[raw.v4l2_buffer]:
+    ) -> typing.List[raw.v4l2_buffer]:
         return enqueue_buffers(self.fileno(), buffer_type, memory, count)
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
@@ -779,7 +780,7 @@ class BufferManager(DeviceHelper):
     def dequeue_buffer(self, memory: Memory) -> raw.v4l2_buffer:
         return self.device.dequeue_buffer(self.type, memory)
 
-    def enqueue_buffers(self, memory: Memory) -> list[raw.v4l2_buffer]:
+    def enqueue_buffers(self, memory: Memory) -> typing.List[raw.v4l2_buffer]:
         return self.device.enqueue_buffers(self.type, memory, self.size)
 
     def free_buffers(self, memory: Memory):
