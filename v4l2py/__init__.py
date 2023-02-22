@@ -6,4 +6,4 @@
 
 from .device import Device, VideoCapture, iter_devices, iter_video_capture_devices
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
