@@ -280,7 +280,7 @@ def iter_read_controls(fd):
     ctrl_ext.id = nxt
     for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
         if not (ctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (
-            ctrl_ext.type & raw.V4L2_CTRL_TYPE_CTRL_CLASS
+            ctrl_ext.type == raw.V4L2_CTRL_TYPE_CTRL_CLASS
         ):
             yield copy.deepcopy(ctrl_ext)
         ctrl_ext.id |= nxt
