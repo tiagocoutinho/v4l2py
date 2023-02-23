@@ -153,7 +153,7 @@ def raw_crop_caps_to_crop_caps(stream_type, crop):
 CropCapability.from_raw = raw_crop_caps_to_crop_caps
 
 
-def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
+def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1, ignore_einval=False):
     for index in range(start, stop, step):
         indexed_struct.index = index
         try:
@@ -161,7 +161,10 @@ def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
             yield indexed_struct
         except OSError as error:
             if error.errno == errno.EINVAL:
-                break
+                if ignore_einval:
+                    continue
+                else:
+                    break
             else:
                 raise
 
@@ -287,6 +290,17 @@ def iter_read_controls(fd):
         ):
             yield copy.deepcopy(ctrl_ext)
         ctrl_ext.id |= nxt
+
+
+def iter_read_menu(fd, ctrl):
+    menu = raw.v4l2_querymenu()
+    menu.id = ctrl.id
+    for menu in iter_read(
+            fd, IOC.QUERYMENU, menu,
+            start=ctrl.info.minimum, stop=ctrl.info.maximum+1,
+            step=ctrl.info.step, ignore_einval=True
+        ):
+            yield copy.deepcopy(menu)
 
 
 def read_info(fd):
@@ -754,6 +768,16 @@ class Device(ReentrantContextManager):
         self._fobj.write(data)
 
 
+class MenuItem:
+    def __init__(self, item):
+        self.item = item
+        self.index = item.index
+        self.name = item.name.decode()
+
+    def __repr__(self):
+        return f"<{type(self).__name__} index={self.index} name={self.name}>"
+
+
 class Control:
     def __init__(self, device, info):
         self.device = device
@@ -761,6 +785,12 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self.type = ControlType(self.info.type)
+        if self.type == raw.V4L2_CTRL_TYPE_MENU:
+            self.menu = {
+                menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            self.menu = {}
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
