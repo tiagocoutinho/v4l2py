@@ -8,7 +8,7 @@
 
 import flask
 
-from v4l2py import Device, iter_video_capture_devices
+from v4l2py import Device
 
 app = flask.Flask("basic-web-cam")
 
@@ -18,7 +18,7 @@ SUFFIX = b"\r\n"
 
 
 def gen_frames():
-    with Device.from_id(1) as device:
+    with Device.from_id(0) as device:
         for frame in device:
             yield b"".join((PREFIX, frame, SUFFIX))
 

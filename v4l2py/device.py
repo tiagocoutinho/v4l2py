@@ -14,6 +14,7 @@ import fcntl
 import fractions
 import logging
 import mmap
+import os
 import pathlib
 import typing
 
@@ -548,8 +549,12 @@ def set_priority(fd, priority: Priority):
     ioctl(fd, IOC.S_PRIORITY, priority)
 
 
+def opener(path, flags):
+    return os.open(path, flags)  # | os.O_NONBLOCK)
+
+
 def fopen(path, rw=False):
-    return open(path, "rb+" if rw else "rb", buffering=0)
+    return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
 
 
 # Helpers
@@ -609,16 +614,28 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    def __init__(self, filename, read_write=True):
+    opener = open
+
+    def __init__(self, name_or_file, read_write=True):
         super().__init__()
-        filename = pathlib.Path(filename)
-        self.log = log.getChild(filename.stem)
-        self._read_write = read_write
-        self._fobj = None
-        self.filename = filename
-        self.index = device_number(filename)
         self.info = None
         self.controls = {}
+        if isinstance(name_or_file, (str, pathlib.Path)):
+            filename = pathlib.Path(name_or_file)
+            self._read_write = read_write
+            self._fobj = None
+        elif isinstance(name_or_file, str):
+            filename = pathlib.Path(name_or_file.name)
+            self._read_write = "+" in name_or_file.mode
+            self._fobj = name_or_file
+            # this object context manager won't close the file anymore
+            self._context_level += 1
+            self._init()
+        else:
+            raise TypeError("name_or_file must be str or a file object")
+        self.log = log.getChild(filename.stem)
+        self.filename = filename
+        self.index = device_number(filename)
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
@@ -636,14 +653,17 @@ class Device(ReentrantContextManager):
     def from_id(cls, did: int):
         return cls("/dev/video{}".format(did))
 
+    def _init(self):
+        self.info = read_info(self.fileno())
+        self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
+
     def open(self):
         if not self._fobj:
             self.log.info("opening %s", self.filename)
-            self._fobj = fopen(self.filename, self._read_write)
-            self.info = read_info(self.fileno())
-            self.controls = {
-                ctrl.id: Control(self, ctrl) for ctrl in self.info.controls
-            }
+            self._fobj = self.opener(
+                self.filename, "rb+" if self._read_write else "rb", buffering=0
+            )
+            self._init()
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
@@ -659,6 +679,10 @@ class Device(ReentrantContextManager):
     @property
     def closed(self):
         return self._fobj is None or self._fobj.closed
+
+    @property
+    def is_blocking(self):
+        return os.get_blocking(self.fileno())
 
     def query_buffer(self, buffer_type, memory, index):
         return query_buffer(self.fileno(), buffer_type, memory, index)
@@ -903,9 +927,12 @@ class MemoryMap(ReentrantContextManager):
             self.buffer_manager.device.log.info("Buffers freed")
 
     def read(self):
-        # file was NOT opened with O_NONBLOCK: DQBUF will block until a buffer is
-        # available for read. If we want to multplex we can call select.select()
-        # before calling read
+        # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
+        # is available for read. So we need to do it here
+        if not self.buffer_manager.device.is_blocking:
+            import select
+
+            select.select((self.buffer_manager.device,), (), ())
         with self.reader as buff:
             return self.buffers[buff.index][: buff.bytesused]
 
@@ -952,10 +979,14 @@ def iter_devices(path="/dev"):
     return (Device(name) for name in iter_video_files(path=path))
 
 
-def iter_video_capture_devices(path="/dev"):
+def iter_video_capture_files(path="/dev"):
     def filt(filename):
         with fopen(filename) as fobj:
             caps = read_capabilities(fobj.fileno())
             return Capability.VIDEO_CAPTURE in Capability(caps.device_caps)
 
-    return (Device(name) for name in filter(filt, iter_video_files(path)))
+    return filter(filt, iter_video_files(path))
+
+
+def iter_video_capture_devices(path="/dev"):
+    return (Device(name) for name in iter_video_capture_files(path))

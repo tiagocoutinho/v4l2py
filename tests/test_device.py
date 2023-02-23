@@ -89,10 +89,9 @@ def test_device_open():
     filename = "/dev/myvideo"
     hw = Hardware(filename)
 
-    with mock.patch("v4l2py.device.open", hw.open), mock.patch(
-        "v4l2py.device.fcntl.ioctl", hw.ioctl
-    ):
+    with mock.patch("v4l2py.device.fcntl.ioctl", hw.ioctl):
         device = Device(filename)
+        device.opener = hw.open
         device.open()
         assert not device.closed
 
@@ -101,10 +100,9 @@ def test_device_info():
     filename = "/dev/myvideo"
     hw = Hardware(filename)
 
-    with mock.patch("v4l2py.device.open", hw.open), mock.patch(
-        "v4l2py.device.fcntl.ioctl", hw.ioctl
-    ):
+    with mock.patch("v4l2py.device.fcntl.ioctl", hw.ioctl):
         device = Device(filename)
+        device.opener = hw.open
         assert device.info is None
         device.open()
         assert device.info.driver == hw.driver.decode()
