@@ -26,6 +26,7 @@ class Hardware:
         self.fd = randint(10, 100)
         self.fobj = mock.Mock()
         self.fobj.fileno.return_value = self.fd
+        self.fobj.get_blocking.return_value = True
         self.fobj.closed = False
         return self.fobj
 

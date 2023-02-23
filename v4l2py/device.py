@@ -16,6 +16,7 @@ import logging
 import mmap
 import os
 import pathlib
+import select
 import typing
 
 from . import raw
@@ -926,15 +927,23 @@ class MemoryMap(ReentrantContextManager):
             self.buffers = None
             self.buffer_manager.device.log.info("Buffers freed")
 
-    def read(self):
-        # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
-        # is available for read. So we need to do it here
-        if not self.buffer_manager.device.is_blocking:
-            import select
-
-            select.select((self.buffer_manager.device,), (), ())
+    def raw_read(self):
         with self.reader as buff:
             return self.buffers[buff.index][: buff.bytesused]
+
+    def wait_read(self):
+        select.select((self.buffer_manager.device,), (), ())
+        return self.raw_read()
+
+    def read(self):
+        # first time we check in what mode device was opened (blocking vs non-blocking)
+        # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
+        # is available for read. So we need to do it here
+        if self.buffer_manager.device.is_blocking:
+            self.read = self.raw_read
+        else:
+            self.read = self.wait_read
+        return self.read()
 
 
 class QueueReader:
