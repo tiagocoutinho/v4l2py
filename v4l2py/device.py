@@ -149,7 +149,7 @@ def raw_crop_caps_to_crop_caps(stream_type, crop):
 CropCapability.from_raw = raw_crop_caps_to_crop_caps
 
 
-def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
+def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1, ignore_einval=False):
     for index in range(start, stop, step):
         indexed_struct.index = index
         try:
@@ -157,7 +157,10 @@ def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1):
             yield indexed_struct
         except OSError as error:
             if error.errno == errno.EINVAL:
-                break
+                if ignore_einval:
+                    continue
+                else:
+                    break
             else:
                 raise
 
