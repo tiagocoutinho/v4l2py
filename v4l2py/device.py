@@ -778,12 +778,20 @@ class MenuItem:
         return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
+def config_name(name: str) -> str:
+    res = name.lower()
+    for r in (", ", " "):
+        res = res.replace(r, "_")
+    return res
+
+
 class Control:
     def __init__(self, device, info):
         self.device = device
         self.info = info
         self.id = self.info.id
         self.name = info.name.decode()
+        self.config_name = config_name(self.name)
         self.type = ControlType(self.info.type)
         if self.type == raw.V4L2_CTRL_TYPE_MENU:
             self.menu = {
@@ -793,7 +801,7 @@ class Control:
             self.menu = {}
 
     def __repr__(self):
-        return f"<{type(self).__name__} name={self.name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
+        return f"<{type(self).__name__} name={self.config_name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
 
     @property
     def value(self):
