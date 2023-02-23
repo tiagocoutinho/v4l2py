@@ -14,6 +14,7 @@ import logging
 import flask
 import gevent
 import gevent.event
+import gevent.fileobject
 import gevent.monkey
 import gevent.queue
 import gevent.time
@@ -142,6 +143,7 @@ def cameras() -> list[Camera]:
     if CAMERAS is None:
         cameras = {}
         for device in iter_video_capture_devices():
+            device.opener = gevent.fileobject.FileObject
             with device:
                 # pass just to make it read camera info
                 pass

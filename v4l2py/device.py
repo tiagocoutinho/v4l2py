@@ -14,7 +14,10 @@ import fcntl
 import fractions
 import logging
 import mmap
+import os
 import pathlib
+import select
+import typing
 
 from . import raw
 
@@ -53,6 +56,7 @@ InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFla
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
 ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
+Priority = _enum("Priority", "V4L2_PRIORITY_")
 
 
 def human_pixel_format(ifmt):
@@ -549,8 +553,23 @@ def set_control(fd, id, value):
     ioctl(fd, IOC.S_CTRL, control)
 
 
+def get_priority(fd) -> Priority:
+    priority = raw.enum()
+    ioctl(fd, IOC.G_PRIORITY, priority)
+    return Priority(priority.value)
+
+
+def set_priority(fd, priority: Priority):
+    priority = raw.enum(priority.value)
+    ioctl(fd, IOC.S_PRIORITY, priority)
+
+
+def opener(path, flags):
+    return os.open(path, flags)  # | os.O_NONBLOCK)
+
+
 def fopen(path, rw=False):
-    return open(path, "rb+" if rw else "rb", buffering=0)
+    return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
 
 
 # Helpers
@@ -563,7 +582,7 @@ def create_buffer(fd, buffer_type: BufferType, memory: Memory) -> raw.v4l2_buffe
 
 def create_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[raw.v4l2_buffer]:
+) -> typing.List[raw.v4l2_buffer]:
     """request + query buffers"""
     request_buffers(fd, buffer_type, memory, count)
     return [query_buffer(fd, buffer_type, memory, index) for index in range(count)]
@@ -575,7 +594,7 @@ def mmap_from_buffer(fd, buff: raw.v4l2_buffer) -> mmap.mmap:
 
 def create_mmap_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[mmap.mmap]:
+) -> typing.List[mmap.mmap]:
     """create buffers + mmap_from_buffer"""
     return [
         mmap_from_buffer(fd, buff)
@@ -589,7 +608,7 @@ def create_mmap_buffer(fd, buffer_type: BufferType, memory: Memory) -> mmap.mmap
 
 def enqueue_buffers(
     fd, buffer_type: BufferType, memory: Memory, count: int
-) -> list[raw.v4l2_buffer]:
+) -> typing.List[raw.v4l2_buffer]:
     return [enqueue_buffer(fd, buffer_type, memory, index) for index in range(count)]
 
 
@@ -610,16 +629,28 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    def __init__(self, filename, read_write=True):
+    opener = open
+
+    def __init__(self, name_or_file, read_write=True):
         super().__init__()
-        filename = pathlib.Path(filename)
-        self.log = log.getChild(filename.stem)
-        self._read_write = read_write
-        self._fobj = None
-        self.filename = filename
-        self.index = device_number(filename)
         self.info = None
         self.controls = {}
+        if isinstance(name_or_file, (str, pathlib.Path)):
+            filename = pathlib.Path(name_or_file)
+            self._read_write = read_write
+            self._fobj = None
+        elif isinstance(name_or_file, str):
+            filename = pathlib.Path(name_or_file.name)
+            self._read_write = "+" in name_or_file.mode
+            self._fobj = name_or_file
+            # this object context manager won't close the file anymore
+            self._context_level += 1
+            self._init()
+        else:
+            raise TypeError("name_or_file must be str or a file object")
+        self.log = log.getChild(filename.stem)
+        self.filename = filename
+        self.index = device_number(filename)
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
@@ -637,14 +668,17 @@ class Device(ReentrantContextManager):
     def from_id(cls, did: int):
         return cls("/dev/video{}".format(did))
 
+    def _init(self):
+        self.info = read_info(self.fileno())
+        self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
+
     def open(self):
         if not self._fobj:
             self.log.info("opening %s", self.filename)
-            self._fobj = fopen(self.filename, self._read_write)
-            self.info = read_info(self.fileno())
-            self.controls = {
-                ctrl.id: Control(self, ctrl) for ctrl in self.info.controls
-            }
+            self._fobj = self.opener(
+                self.filename, "rb+" if self._read_write else "rb", buffering=0
+            )
+            self._init()
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
     def close(self):
@@ -660,6 +694,10 @@ class Device(ReentrantContextManager):
     @property
     def closed(self):
         return self._fobj is None or self._fobj.closed
+
+    @property
+    def is_blocking(self):
+        return os.get_blocking(self.fileno())
 
     def query_buffer(self, buffer_type, memory, index):
         return query_buffer(self.fileno(), buffer_type, memory, index)
@@ -679,7 +717,7 @@ class Device(ReentrantContextManager):
 
     def create_buffers(
         self, buffer_type: BufferType, memory: Memory, count: int
-    ) -> list[raw.v4l2_buffer]:
+    ) -> typing.List[raw.v4l2_buffer]:
         return create_buffers(self.fileno(), buffer_type, memory, count)
 
     def free_buffers(self, buffer_type, memory):
@@ -687,7 +725,7 @@ class Device(ReentrantContextManager):
 
     def enqueue_buffers(
         self, buffer_type: BufferType, memory: Memory, count: int
-    ) -> list[raw.v4l2_buffer]:
+    ) -> typing.List[raw.v4l2_buffer]:
         return enqueue_buffers(self.fileno(), buffer_type, memory, count)
 
     def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
@@ -709,6 +747,12 @@ class Device(ReentrantContextManager):
 
     def get_selection(self, buffer_type, target):
         return get_selection(self.fileno(), buffer_type, target)
+
+    def get_priority(self) -> Priority:
+        return get_priority(self.fileno())
+
+    def set_priority(self, priority: Priority):
+        set_priority(self.fileno(), priority)
 
     def stream_on(self, buffer_type):
         self.log.info("Starting %r stream...", buffer_type.name)
@@ -791,7 +835,7 @@ class BufferManager(DeviceHelper):
     def dequeue_buffer(self, memory: Memory) -> raw.v4l2_buffer:
         return self.device.dequeue_buffer(self.type, memory)
 
-    def enqueue_buffers(self, memory: Memory) -> list[raw.v4l2_buffer]:
+    def enqueue_buffers(self, memory: Memory) -> typing.List[raw.v4l2_buffer]:
         return self.device.enqueue_buffers(self.type, memory, self.size)
 
     def free_buffers(self, memory: Memory):
@@ -891,7 +935,7 @@ class MemoryMap(ReentrantContextManager):
             while True:
                 await event.wait()
                 event.clear()
-                yield self.raw_read()
+                yield self.read()
         finally:
             loop.remove_reader(device.fileno())
 
@@ -917,11 +961,19 @@ class MemoryMap(ReentrantContextManager):
         with self.reader as buff:
             return self.buffers[buff.index][: buff.bytesused]
 
-    def read(self):
-        # file was NOT opened with O_NONBLOCK: DQBUF will block until a buffer is
-        # available for read. If we want to multplex we can call select.select()
-        # before calling read
+    def wait_read(self):
+        select.select((self.buffer_manager.device,), (), ())
         return self.raw_read()
+
+    def read(self):
+        # first time we check in what mode device was opened (blocking vs non-blocking)
+        # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
+        # is available for read. So we need to do it here
+        if self.buffer_manager.device.is_blocking:
+            self.read = self.raw_read
+        else:
+            self.read = self.wait_read
+        return self.read()
 
 
 class QueueReader:
@@ -966,10 +1018,14 @@ def iter_devices(path="/dev"):
     return (Device(name) for name in iter_video_files(path=path))
 
 
-def iter_video_capture_devices(path="/dev"):
+def iter_video_capture_files(path="/dev"):
     def filt(filename):
         with fopen(filename) as fobj:
             caps = read_capabilities(fobj.fileno())
             return Capability.VIDEO_CAPTURE in Capability(caps.device_caps)
 
-    return (Device(name) for name in filter(filt, iter_video_files(path)))
+    return filter(filt, iter_video_files(path))
+
+
+def iter_video_capture_devices(path="/dev"):
+    return (Device(name) for name in iter_video_capture_files(path))

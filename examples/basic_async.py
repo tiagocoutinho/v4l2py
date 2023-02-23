@@ -5,7 +5,7 @@ import time
 from v4l2py.device import Device, VideoCapture
 
 fmt = "%(threadName)-10s %(asctime)-15s %(levelname)-5s %(name)s: %(message)s"
-logging.basicConfig(level="WARNING", format=fmt)
+logging.basicConfig(level="INFO", format=fmt)
 
 
 async def main():
@@ -28,4 +28,7 @@ async def main():
                 i += 1
 
 
-asyncio.run(main())
+try:
+    asyncio.run(main())
+except KeyboardInterrupt:
+    logging.info("Ctrl-C pressed. Bailing out")
