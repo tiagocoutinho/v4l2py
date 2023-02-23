@@ -288,6 +288,17 @@ def iter_read_controls(fd):
         ctrl_ext.id |= nxt
 
 
+def iter_read_menu(fd, ctrl):
+    menu = raw.v4l2_querymenu()
+    menu.id = ctrl.id
+    for menu in iter_read(
+            fd, IOC.QUERYMENU, menu,
+            start=ctrl.info.minimum, stop=ctrl.info.maximum+1,
+            step=ctrl.info.step, ignore_einval=True
+        ):
+            yield copy.deepcopy(menu)
+
+
 def read_info(fd):
     caps = read_capabilities(fd)
     version_tuple = (
@@ -713,6 +724,16 @@ class Device(ReentrantContextManager):
         self._fobj.write(data)
 
 
+class MenuItem:
+    def __init__(self, item):
+        self.item = item
+        self.index = item.index
+        self.name = item.name.decode()
+
+    def __repr__(self):
+        return f"<{type(self).__name__} index={self.index} name={self.name}>"
+
+
 class Control:
     def __init__(self, device, info):
         self.device = device
@@ -720,6 +741,12 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self.type = ControlType(self.info.type)
+        if self.type == raw.V4L2_CTRL_TYPE_MENU:
+            self.menu = {
+                menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            self.menu = {}
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
