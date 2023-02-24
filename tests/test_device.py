@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from errno import EINVAL
 from inspect import isgenerator
 from pathlib import Path
@@ -7,11 +8,17 @@ from unittest import mock
 import pytest
 
 from v4l2py import raw
-from v4l2py.device import Device, iter_devices, iter_video_files
+from v4l2py.device import (
+    Device,
+    VideoCapture,
+    device_number,
+    iter_devices,
+    iter_video_files,
+)
 
 
 class Hardware:
-    def __init__(self, filename):
+    def __init__(self, filename="/dev/myvideo"):
         self.filename = filename
         self.fd = None
         self.fobj = None
@@ -22,8 +29,19 @@ class Hardware:
         self.version = 5 << 16 | 4 << 8 | 12
         self.version_str = "5.4.12"
 
+    def __enter__(self):
+        self.stack = ExitStack()
+        ioctl = mock.patch("v4l2py.device.fcntl.ioctl", self.ioctl)
+        opener = mock.patch("v4l2py.device.Device.opener", self.open)
+        self.stack.enter_context(ioctl)
+        self.stack.enter_context(opener)
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.stack.close()
+
     def open(self, filename, mode, buffering=-1):
-        self.fd = randint(10, 100)
+        self.fd = randint(100, 1000)
         self.fobj = mock.Mock()
         self.fobj.fileno.return_value = self.fd
         self.fobj.get_blocking.return_value = True
@@ -54,6 +72,18 @@ class Hardware:
         return 0
 
 
+@pytest.mark.parametrize(
+    "filename, expected",
+    [
+        ("/dev/video0", 0),
+        ("/dev/video1", 1),
+        ("/dev/video999", 999),
+    ],
+)
+def test_device_number(filename, expected):
+    assert device_number(filename) == expected
+
+
 def test_video_files():
     with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
         expected_files = ["/dev/video0", "/dev/video55"]
@@ -79,30 +109,39 @@ def test_device_list():
 
 def test_device_creation():
     # This should not raise an error until open() is called
-    Device("/unknown")
+    device = Device("/unknown")
+    assert str(device.filename) == "/unknown"
+    assert device.filename.name == "unknown"
+    assert device.closed
 
     for name in (1, 1.1, True, [], {}, (), set()):
         with pytest.raises(TypeError):
             Device(name)
 
 
-def test_device_open():
-    filename = "/dev/myvideo"
-    hw = Hardware(filename)
+def test_device_creation_from_id():
+    # This should not raise an error until open() is called
+    device = Device.from_id(33)
+    assert str(device.filename) == "/dev/video33"
+    assert device.filename.name == "video33"
+    assert device.closed
 
-    with mock.patch("v4l2py.device.fcntl.ioctl", hw.ioctl):
-        device = Device(filename)
-        device.opener = hw.open
+
+def test_device_open():
+    with Hardware() as hw:
+        device = Device(hw.filename)
+        hw.fobj is None
+        assert device.closed
+        assert device.info is None
         device.open()
         assert not device.closed
+        assert device.info is not None
+        assert device.fileno() == hw.fd
 
 
 def test_device_info():
-    filename = "/dev/myvideo"
-    hw = Hardware(filename)
-
-    with mock.patch("v4l2py.device.fcntl.ioctl", hw.ioctl):
-        device = Device(filename)
+    with Hardware() as hw:
+        device = Device(hw.filename)
         device.opener = hw.open
         assert device.info is None
         device.open()
@@ -110,3 +149,18 @@ def test_device_info():
         assert device.info.bus_info == hw.bus_info.decode()
         assert device.info.bus_info == hw.bus_info.decode()
         assert device.info.version == hw.version_str
+
+
+def test_device_repr():
+    with Hardware() as hw:
+        device = Device(hw.filename)
+        assert repr(device) == f"<Device name={hw.filename}, closed=True>"
+        device.open()
+        assert repr(device) == f"<Device name={hw.filename}, closed=False>"
+
+
+def test_create_video_capture():
+    with Hardware() as hw:
+        device = Device(hw.filename)
+        video_capture = VideoCapture(device)
+        assert video_capture.device is device
