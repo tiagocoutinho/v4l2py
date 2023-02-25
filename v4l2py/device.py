@@ -297,10 +297,10 @@ def iter_read_menu(fd, ctrl):
     menu.id = ctrl.id
     for menu in iter_read(
             fd, IOC.QUERYMENU, menu,
-            start=ctrl.info.minimum, stop=ctrl.info.maximum+1,
+            start=ctrl.info.minimum, stop=ctrl.info.maximum + 1,
             step=ctrl.info.step, ignore_einval=True
-        ):
-            yield copy.deepcopy(menu)
+            ):
+        yield copy.deepcopy(menu)
 
 
 def read_info(fd):
@@ -793,7 +793,7 @@ class Control:
         self.name = info.name.decode()
         self.config_name = config_name(self.name)
         self.type = ControlType(self.info.type)
-        if self.type == raw.V4L2_CTRL_TYPE_MENU:
+        if self.type == ControlType.MENU:
             self.menu = {
                 menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
             }
