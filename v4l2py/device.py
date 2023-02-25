@@ -666,7 +666,7 @@ class Device(ReentrantContextManager):
 
     @classmethod
     def from_id(cls, did: int):
-        return cls("/dev/video{}".format(did))
+        return cls(f"/dev/video{did}")
 
     def _init(self):
         self.info = read_info(self.fileno())
@@ -974,7 +974,7 @@ class MemoryMap(ReentrantContextManager):
         return self.raw_read()
 
     def read(self):
-        # first time we check in what mode device was opened (blocking vs non-blocking)
+        # first time we check what mode device was opened (blocking vs non-blocking)
         # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
         # is available for read. So we need to do it here
         if self.buffer_manager.device.is_blocking:
