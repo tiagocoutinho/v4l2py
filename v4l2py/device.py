@@ -666,7 +666,7 @@ class Device(ReentrantContextManager):
 
     @classmethod
     def from_id(cls, did: int):
-        return cls(f"/dev/video{did}")
+        return cls("/dev/video{}".format(did))
 
     def _init(self):
         self.info = read_info(self.fileno())
@@ -785,7 +785,7 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self.type = ControlType(self.info.type)
-        if self.type == ControlType.MENU:
+        if self.type == raw.V4L2_CTRL_TYPE_MENU:
             self.menu = {
                 menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
             }
@@ -966,7 +966,7 @@ class MemoryMap(ReentrantContextManager):
         return self.raw_read()
 
     def read(self):
-        # first time we check what mode device was opened (blocking vs non-blocking)
+        # first time we check in what mode device was opened (blocking vs non-blocking)
         # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
         # is available for read. So we need to do it here
         if self.buffer_manager.device.is_blocking:
