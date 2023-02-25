@@ -57,6 +57,7 @@ InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFla
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
 ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
 ControlID = _enum("ControlID", "V4L2_CID_")
+ControlFlag = _enum("ControlFlag", "V4L2_CTRL_FLAG_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 Priority = _enum("Priority", "V4L2_PRIORITY_")
 
@@ -284,10 +285,10 @@ def iter_read_inputs(fd):
 
 def iter_read_controls(fd):
     ctrl_ext = raw.v4l2_query_ext_ctrl()
-    nxt = raw.V4L2_CTRL_FLAG_NEXT_CTRL | raw.V4L2_CTRL_FLAG_NEXT_COMPOUND
+    nxt = ControlFlag.NEXT_CTRL | ControlFlag.NEXT_COMPOUND
     ctrl_ext.id = nxt
     for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
-        if not (ctrl_ext.flags & raw.V4L2_CTRL_FLAG_DISABLED) and not (
+        if not (ctrl_ext.flags & ControlFlag.DISABLED) and not (
             ctrl_ext.type == raw.V4L2_CTRL_TYPE_CTRL_CLASS
         ):
             yield copy.deepcopy(ctrl_ext)
