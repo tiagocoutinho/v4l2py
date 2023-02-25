@@ -785,7 +785,7 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self.type = ControlType(self.info.type)
-        if self.type == raw.V4L2_CTRL_TYPE_MENU:
+        if self.type == ControlType.MENU:
             self.menu = {
                 menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
             }
