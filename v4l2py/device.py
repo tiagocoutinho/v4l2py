@@ -802,7 +802,26 @@ class Control:
             self.menu = {}
 
     def __repr__(self):
-        return f"<{type(self).__name__} name={self.config_name}, type={self.type.name}, min={self.info.minimum}, max={self.info.maximum}, step={self.info.step}>"
+        repr = f"{self.config_name} type={self.type.name.lower()}"
+        if self.type != ControlType.BOOLEAN:
+            repr += f" min={self.info.minimum} max={self.info.maximum} step={self.info.step}"
+        repr += f" default={self.info.default_value}"
+        if not (self.info.flags & ControlFlag.WRITE_ONLY):
+            repr += f" value={self.value}"
+
+        flg = []
+        for flag, text in (
+            (ControlFlag.READ_ONLY, "read-only"),
+            (ControlFlag.WRITE_ONLY, "write-only"),
+            (ControlFlag.INACTIVE, "inactive"),
+            (ControlFlag.GRABBED, "grabbed")
+        ):
+            if self.info.flags & flag:
+                flg.append(text)
+        if len(flg):
+            repr += " flags=" + ",".join(flg)
+
+        return f"<{type(self).__name__} {repr}>"
 
     @property
     def value(self):
