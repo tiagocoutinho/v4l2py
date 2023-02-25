@@ -809,7 +809,7 @@ class Control:
 
     @value.setter
     def value(self, value):
-        return set_control(self.device, self.id, value)
+        set_control(self.device, self.id, value)
 
 
 class DeviceHelper:
