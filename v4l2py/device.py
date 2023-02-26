@@ -16,10 +16,11 @@ import logging
 import mmap
 import os
 import pathlib
-import select
 import typing
 
 from . import raw
+from .io import IO, fopen
+
 
 log = logging.getLogger(__name__)
 log_ioctl = log.getChild("ioctl")
@@ -55,6 +56,7 @@ InputType = _enum("InputType", "V4L2_INPUT_TYPE_")
 InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFlag)
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
 ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
+ControlID = _enum("ControlID", "V4L2_CID_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 Priority = _enum("Priority", "V4L2_PRIORITY_")
 
@@ -296,10 +298,14 @@ def iter_read_menu(fd, ctrl):
     menu = raw.v4l2_querymenu()
     menu.id = ctrl.id
     for menu in iter_read(
-            fd, IOC.QUERYMENU, menu,
-            start=ctrl.info.minimum, stop=ctrl.info.maximum + 1,
-            step=ctrl.info.step, ignore_einval=True
-            ):
+        fd,
+        IOC.QUERYMENU,
+        menu,
+        start=ctrl.info.minimum,
+        stop=ctrl.info.maximum + 1,
+        step=ctrl.info.step,
+        ignore_einval=True,
+    ):
         yield copy.deepcopy(menu)
 
 
@@ -564,14 +570,6 @@ def set_priority(fd, priority: Priority):
     ioctl(fd, IOC.S_PRIORITY, priority)
 
 
-def opener(path, flags):
-    return os.open(path, flags)  # | os.O_NONBLOCK)
-
-
-def fopen(path, rw=False):
-    return open(path, "rb+" if rw else "rb", buffering=0, opener=opener)
-
-
 # Helpers
 
 
@@ -629,12 +627,11 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    opener = open
-
-    def __init__(self, name_or_file, read_write=True):
+    def __init__(self, name_or_file, read_write=True, io=IO):
         super().__init__()
         self.info = None
         self.controls = {}
+        self.io = io
         if isinstance(name_or_file, (str, pathlib.Path)):
             filename = pathlib.Path(name_or_file)
             self._read_write = read_write
@@ -665,8 +662,8 @@ class Device(ReentrantContextManager):
                 yield frame
 
     @classmethod
-    def from_id(cls, did: int):
-        return cls(f"/dev/video{did}")
+    def from_id(cls, did: int, **kwargs):
+        return cls("/dev/video{}".format(did), **kwargs)
 
     def _init(self):
         self.info = read_info(self.fileno())
@@ -675,9 +672,7 @@ class Device(ReentrantContextManager):
     def open(self):
         if not self._fobj:
             self.log.info("opening %s", self.filename)
-            self._fobj = self.opener(
-                self.filename, "rb+" if self._read_write else "rb", buffering=0
-            )
+            self._fobj = self.io.open(self.filename, self._read_write)
             self._init()
             self.log.info("opened %s (%s)", self.filename, self.info.card)
 
@@ -793,9 +788,14 @@ class Control:
         self.name = info.name.decode()
         self.config_name = config_name(self.name)
         self.type = ControlType(self.info.type)
+        try:
+            self.standard = ControlID(self.id)
+        except ValueError:
+            self.standard = None
         if self.type == ControlType.MENU:
             self.menu = {
-                menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
+                menu.index: MenuItem(menu)
+                for menu in iter_read_menu(self.device._fobj, self)
             }
         else:
             self.menu = {}
@@ -970,7 +970,8 @@ class MemoryMap(ReentrantContextManager):
             return self.buffers[buff.index][: buff.bytesused]
 
     def wait_read(self):
-        select.select((self.buffer_manager.device,), (), ())
+        device = self.buffer_manager.device
+        device.io.select((device,), (), ())
         return self.raw_read()
 
     def read(self):
@@ -1022,8 +1023,8 @@ def iter_video_files(path="/dev"):
     return sorted(path.glob("video*"))
 
 
-def iter_devices(path="/dev"):
-    return (Device(name) for name in iter_video_files(path=path))
+def iter_devices(path="/dev", **kwargs):
+    return (Device(name, **kwargs) for name in iter_video_files(path=path))
 
 
 def iter_video_capture_files(path="/dev"):
@@ -1035,5 +1036,5 @@ def iter_video_capture_files(path="/dev"):
     return filter(filt, iter_video_files(path))
 
 
-def iter_video_capture_devices(path="/dev"):
-    return (Device(name) for name in iter_video_capture_files(path))
+def iter_video_capture_devices(path="/dev", **kwargs):
+    return (Device(name, **kwargs) for name in iter_video_capture_files(path))
