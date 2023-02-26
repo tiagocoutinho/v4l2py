@@ -22,10 +22,9 @@
     # elif control.type == ControlType.BOOLEAN:
         <div class="form-check">
             <input type="checkbox" class="form-check-input"
-                 value=""
+                 name="value"
                  id="checkbox-{{did}}-{{control.id}}"
                  hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
-                 hx-target="#control-{{did}}-{{control.id}}" hx-swap="outerHTML"
                  {{"checked" if value else "" }}
             >
             <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
@@ -33,7 +32,10 @@
             </label>
         </div>
     # elif control.type == ControlType.MENU:
-        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example">
+        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example"
+            name="value"
+            hx-post="/camera/{{did}}/control/{{control.id}}"
+        >
         # for index, item in control.menu.items():
             <option value="{{index}}" {{"selected" if value == index else ""}}>{{item.name}}</option>
         # endfor

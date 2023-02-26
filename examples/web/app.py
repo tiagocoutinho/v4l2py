@@ -231,9 +231,7 @@ def set_control_value(device_id, control_id, value):
     with camera.device:
         control = camera.device.controls[control_id]
         control.value = value
-    return flask.render_template(
-        "control.html", control=control, ControlType=ControlType
-    )
+    return "", 204
 
 
 @app.post("/camera/<int:device_id>/control/<int:control_id>/reset")
