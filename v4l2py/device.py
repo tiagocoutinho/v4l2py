@@ -55,6 +55,7 @@ InputType = _enum("InputType", "V4L2_INPUT_TYPE_")
 InputCapabilities = _enum("InputCapabilities", "V4L2_IN_CAP_", klass=enum.IntFlag)
 ControlClass = _enum("ControlClass", "V4L2_CTRL_CLASS_")
 ControlType = _enum("ControlType", "V4L2_CTRL_TYPE_")
+ControlID = _enum("ControlID", "V4L2_CID_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 Priority = _enum("Priority", "V4L2_PRIORITY_")
 
@@ -296,10 +297,14 @@ def iter_read_menu(fd, ctrl):
     menu = raw.v4l2_querymenu()
     menu.id = ctrl.id
     for menu in iter_read(
-            fd, IOC.QUERYMENU, menu,
-            start=ctrl.info.minimum, stop=ctrl.info.maximum + 1,
-            step=ctrl.info.step, ignore_einval=True
-            ):
+        fd,
+        IOC.QUERYMENU,
+        menu,
+        start=ctrl.info.minimum,
+        stop=ctrl.info.maximum + 1,
+        step=ctrl.info.step,
+        ignore_einval=True,
+    ):
         yield copy.deepcopy(menu)
 
 
@@ -785,9 +790,14 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self.type = ControlType(self.info.type)
-        if self.type == raw.V4L2_CTRL_TYPE_MENU:
+        try:
+            self.standard = ControlID(self.id)
+        except ValueError:
+            self.standard = None
+        if self.type == ControlType.MENU:
             self.menu = {
-                menu.index: MenuItem(menu) for menu in iter_read_menu(self.device._fobj, self)
+                menu.index: MenuItem(menu)
+                for menu in iter_read_menu(self.device._fobj, self)
             }
         else:
             self.menu = {}
@@ -966,7 +976,7 @@ class MemoryMap(ReentrantContextManager):
         return self.raw_read()
 
     def read(self):
-        # first time we check in what mode device was opened (blocking vs non-blocking)
+        # first time we check what mode device was opened (blocking vs non-blocking)
         # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
         # is available for read. So we need to do it here
         if self.buffer_manager.device.is_blocking:

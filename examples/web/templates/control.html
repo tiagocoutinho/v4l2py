@@ -1,5 +1,6 @@
 # set device = control.device
 # set did = device.index
+# set value = control.value
 
 <div class="input-group input-group-sm mb-1" id="control-{{did}}-{{control.id}}">
     # if control.type in [ControlType.INTEGER, ControlType.INTEGER64, ControlType.U32, ControlType.U16, ControlType.U8]:
@@ -8,7 +9,7 @@
             min="{{control.info.minimum}}"
             max="{{control.info.maximum}}"
             step="{{control.info.step}}"
-            value="{{control.value}}"
+            value="{{value}}"
             name="value"
             hx-post="/camera/{{did}}/control/{{control.id}}"
         >
@@ -18,19 +19,25 @@
         >
             Reset
         </button>
-    #elif control.type == ControlType.BOOLEAN:
+    # elif control.type == ControlType.BOOLEAN:
         <div class="form-check">
             <input type="checkbox" class="form-check-input"
                  value=""
                  id="checkbox-{{did}}-{{control.id}}"
-                 hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if control.value else "1"}}"
+                 hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
                  hx-target="#control-{{did}}-{{control.id}}" hx-swap="outerHTML"
-                 {{"checked" if control.value else "" }}
+                 {{"checked" if value else "" }}
             >
             <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
-                {{control.name}} {{control.value}}
+                {{control.name}}
             </label>
         </div>
+    # elif control.type == ControlType.MENU:
+        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example">
+        # for index, item in control.menu.items():
+            <option value="{{index}}" {{"selected" if value == index else ""}}>{{item.name}}</option>
+        # endfor
+        </select>
     # else:
     Unsupported control '{{control.name}}' with type {{control.type.name}}
     #endif
