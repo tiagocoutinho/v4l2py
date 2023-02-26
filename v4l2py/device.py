@@ -809,17 +809,9 @@ class Control:
         if not (self.info.flags & ControlFlag.WRITE_ONLY):
             repr += f" value={self.value}"
 
-        flg = []
-        for flag, text in (
-            (ControlFlag.READ_ONLY, "read-only"),
-            (ControlFlag.WRITE_ONLY, "write-only"),
-            (ControlFlag.INACTIVE, "inactive"),
-            (ControlFlag.GRABBED, "grabbed")
-        ):
-            if self.info.flags & flag:
-                flg.append(text)
-        if len(flg):
-            repr += " flags=" + ",".join(flg)
+        flags = [flag.name.lower() for flag in ControlFlag if (self.info.flags & flag)]
+        if len(flags):
+            repr += " flags=" + ",".join(flags)
 
         return f"<{type(self).__name__} {repr}>"
 
