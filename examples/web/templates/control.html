@@ -1,22 +1,46 @@
 # set device = control.device
 # set did = device.index
+# set value = control.value
 
-<div class="input-group input-group-sm mb-1" id="{{control.name}}-{{did}}">
-
-    <!--<label for="{{control.name}}-{{did}}" class="form-label">{{control.name}}</label>-->
-    <span class="input-group-text">{{control.name}}</span>
-    <input type="range" class="form-range form-control" 
-        min="{{control.info.minimum}}"
-        max="{{control.info.maximum}}"
-        step="{{control.info.step}}"
-        value="{{control.value}}"
-        name="value"
-        hx-post="/camera/{{did}}/control/{{control.id}}"
-    >
-    <button class="btn btn-outline-secondary" type="button"
-        hx-post="/camera/{{did}}/control/{{control.id}}/reset"
-        hx-target="#{{control.name}}-{{did}}" hx-swap="outerHTML"
-    >
-        Reset
-    </button>
+<div class="input-group input-group-sm mb-1" id="control-{{did}}-{{control.id}}">
+    # if control.type in [ControlType.INTEGER, ControlType.INTEGER64, ControlType.U32, ControlType.U16, ControlType.U8]:
+        <span class="input-group-text">{{control.name}}</span>
+        <input type="range" class="form-range form-control"
+            min="{{control.info.minimum}}"
+            max="{{control.info.maximum}}"
+            step="{{control.info.step}}"
+            value="{{value}}"
+            name="value"
+            hx-post="/camera/{{did}}/control/{{control.id}}"
+        >
+        <button class="btn btn-outline-secondary" type="button"
+            hx-post="/camera/{{did}}/control/{{control.id}}/reset"
+            hx-target="#control-{{did}}-{{control.id}}" hx-swap="outerHTML"
+        >
+            Reset
+        </button>
+    # elif control.type == ControlType.BOOLEAN:
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input"
+                 name="value"
+                 id="checkbox-{{did}}-{{control.id}}"
+                 hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
+                 {{"checked" if value else "" }}
+            >
+            <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
+                {{control.name}}
+            </label>
+        </div>
+    # elif control.type == ControlType.MENU:
+        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example"
+            name="value"
+            hx-post="/camera/{{did}}/control/{{control.id}}"
+        >
+        # for index, item in control.menu.items():
+            <option value="{{index}}" {{"selected" if value == index else ""}}>{{item.name}}</option>
+        # endfor
+        </select>
+    # else:
+    Unsupported control '{{control.name}}' with type {{control.type.name}}
+    #endif
 </div>

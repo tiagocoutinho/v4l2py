@@ -21,12 +21,15 @@ import gevent.time
 from PIL import Image
 
 from v4l2py.device import (
+    ControlType,
     Device,
     Format,
     PixelFormat,
     VideoCapture,
     iter_video_capture_devices,
 )
+from v4l2py.io import GeventIO
+
 
 gevent.monkey.patch_all()
 
@@ -142,8 +145,7 @@ def cameras() -> list[Camera]:
     global CAMERAS
     if CAMERAS is None:
         cameras = {}
-        for device in iter_video_capture_devices():
-            device.opener = gevent.fileobject.FileObject
+        for device in iter_video_capture_devices(io=GeventIO):
             with device:
                 # pass just to make it read camera info
                 pass
@@ -204,7 +206,9 @@ def stop(device_id):
 def device(device_id: int):
     camera = cameras()[device_id]
     with camera.device:
-        return flask.render_template("device.html", camera=camera)
+        return flask.render_template(
+            "device.html", camera=camera, ControlType=ControlType
+        )
 
 
 @app.get("/camera/<int:device_id>/stream")
@@ -222,13 +226,24 @@ def set_control(device_id, control_id):
     return "", 204
 
 
+@app.post("/camera/<int:device_id>/control/<int:control_id>/<int:value>")
+def set_control_value(device_id, control_id, value):
+    camera = cameras()[device_id]
+    with camera.device:
+        control = camera.device.controls[control_id]
+        control.value = value
+    return "", 204
+
+
 @app.post("/camera/<int:device_id>/control/<int:control_id>/reset")
 def reset_control(device_id, control_id):
     camera = cameras()[device_id]
     with camera.device:
         control = camera.device.controls[control_id]
         control.value = control.info.default_value
-    return flask.render_template("control.html", control=control)
+    return flask.render_template(
+        "control.html", control=control, ControlType=ControlType
+    )
 
 
 if __name__ == "__main__":

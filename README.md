@@ -101,6 +101,30 @@ frame 10136
 ...
 ```
 
+(check examples/basic_async.py)
+
+### gevent
+
+v4l2py is also gevent friendly:
+
+```
+$ python
+
+>>> from v4l2py import Device, GeventIO
+>>> with Device.from_id(0, io=GeventIO) as camera:
+...     async for frame in camera:
+...         print(f"frame {len(frame)}")
+frame 10224
+frame 10304
+frame 10224
+frame 10136
+...
+```
+
+```
+
+(check examples/basic_gevent.py and examples/web/app.py)
+
 ## Bonus track
 
 You've been patient enough to read until here so, just for you,
