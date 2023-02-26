@@ -28,6 +28,8 @@ from v4l2py.device import (
     VideoCapture,
     iter_video_capture_devices,
 )
+from v4l2py.io import GeventIO
+
 
 gevent.monkey.patch_all()
 
@@ -143,8 +145,7 @@ def cameras() -> list[Camera]:
     global CAMERAS
     if CAMERAS is None:
         cameras = {}
-        for device in iter_video_capture_devices():
-            device.opener = gevent.fileobject.FileObject
+        for device in iter_video_capture_devices(io=GeventIO):
             with device:
                 # pass just to make it read camera info
                 pass
