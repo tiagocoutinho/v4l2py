@@ -32,7 +32,7 @@ class Hardware:
     def __enter__(self):
         self.stack = ExitStack()
         ioctl = mock.patch("v4l2py.device.fcntl.ioctl", self.ioctl)
-        opener = mock.patch("v4l2py.device.Device.opener", self.open)
+        opener = mock.patch("v4l2py.io.open", self.open)
         self.stack.enter_context(ioctl)
         self.stack.enter_context(opener)
         return self
@@ -40,7 +40,7 @@ class Hardware:
     def __exit__(self, exc_type, exc_value, tb):
         self.stack.close()
 
-    def open(self, filename, mode, buffering=-1):
+    def open(self, filename, mode, buffering=-1, opener=None):
         self.fd = randint(100, 1000)
         self.fobj = mock.Mock()
         self.fobj.fileno.return_value = self.fd
