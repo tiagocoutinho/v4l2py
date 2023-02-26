@@ -825,11 +825,25 @@ class Control:
 
     @property
     def value(self):
-        return get_control(self.device, self.id)
+        if self.is_readable:
+            return get_control(self.device, self.id)
+        else:
+            return None
 
     @value.setter
     def value(self, value):
-        set_control(self.device, self.id, value)
+        if self.is_writeable:
+            set_control(self.device, self.id, value)
+        else:
+            raise AttributeError(f"Control {self.config_name} is read-only")
+
+    @property
+    def is_readable(self):
+        return not (self.info.flags & ControlFlag.WRITE_ONLY)
+
+    @property
+    def is_writeable(self):
+        return not (self.info.flags & ControlFlag.READ_ONLY)
 
 
 class DeviceHelper:
