@@ -121,8 +121,6 @@ frame 10136
 ...
 ```
 
-```
-
 (check examples/basic_gevent.py and examples/web/app.py)
 
 ## Bonus track
