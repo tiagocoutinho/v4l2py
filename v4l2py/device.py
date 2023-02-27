@@ -631,7 +631,7 @@ class Device(ReentrantContextManager):
     def __init__(self, name_or_file, read_write=True, io=IO):
         super().__init__()
         self.info = None
-        self.controls = {}
+        self.controls = Controls()
         self.io = io
         if isinstance(name_or_file, (str, pathlib.Path)):
             filename = pathlib.Path(name_or_file)
@@ -668,7 +668,7 @@ class Device(ReentrantContextManager):
 
     def _init(self):
         self.info = read_info(self.fileno())
-        self.controls = {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
+        self.controls = Controls({ctrl.id: Control(self, ctrl) for ctrl in self.info.controls})
 
     def open(self):
         if not self._fobj:
@@ -762,6 +762,30 @@ class Device(ReentrantContextManager):
 
     def write(self, data: bytes) -> None:
         self._fobj.write(data)
+
+
+class Controls(dict):
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            pass
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    def __delattr__(self, key):
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(key)
+
+    def __missing__(self, key):
+        for v in self.values():
+            if isinstance(v, Control) and (v.config_name == key):
+                return v
+        raise KeyError(key)
 
 
 class MenuItem:
