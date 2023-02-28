@@ -798,22 +798,13 @@ class MenuItem:
         return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
-def config_name(name: str) -> str:
-    res = name.lower()
-    for r in ("(", ")"):
-        res = res.replace(r, "")
-    for r in (", ", " "):
-        res = res.replace(r, "_")
-    return res
-
-
 class Control:
     def __init__(self, device, info):
         self.device = device
         self.info = info
         self.id = self.info.id
         self.name = info.name.decode()
-        self.config_name = config_name(self.name)
+        self._config_name = None
         self.type = ControlType(self.info.type)
         try:
             self.standard = ControlID(self.id)
@@ -840,6 +831,17 @@ class Control:
             repr += " flags=" + ",".join(flags)
 
         return f"<{type(self).__name__} {repr}>"
+
+    @property
+    def config_name(self):
+        if self._config_name is None:
+            res = self.name.lower()
+            for r in ("(", ")"):
+                res = res.replace(r, "")
+            for r in (", ", " "):
+                res = res.replace(r, "_")
+            self._config_name = res
+        return self._config_name
 
     @property
     def value(self):
