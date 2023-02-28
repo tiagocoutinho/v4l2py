@@ -800,6 +800,8 @@ class MenuItem:
 
 def config_name(name: str) -> str:
     res = name.lower()
+    for r in ("(", ")"):
+        res = res.replace(r, "")
     for r in (", ", " "):
         res = res.replace(r, "_")
     return res
