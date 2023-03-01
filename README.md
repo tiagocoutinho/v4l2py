@@ -3,6 +3,7 @@
 [![V4L2py][pypi-version]](https://pypi.python.org/pypi/v4l2py)
 [![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/v4l2py)
 ![License][license]
+[![CI][CI]](https://github.com/tiagocoutinho/v4l2py/actions/workflows/ci.yml)
 
 Video for linux 2 (V4L2) python library
 
@@ -100,6 +101,28 @@ frame 10136
 ...
 ```
 
+(check examples/basic_async.py)
+
+### gevent
+
+v4l2py is also gevent friendly:
+
+```
+$ python
+
+>>> from v4l2py import Device, GeventIO
+>>> with Device.from_id(0, io=GeventIO) as camera:
+...     async for frame in camera:
+...         print(f"frame {len(frame)}")
+frame 10224
+frame 10304
+frame 10224
+frame 10136
+...
+```
+
+(check examples/basic_gevent.py and examples/web/app.py)
+
 ## Bonus track
 
 You've been patient enough to read until here so, just for you,
@@ -153,3 +176,4 @@ See the ``linux/videodev2.h`` header file for details.
 [pypi-version]: https://img.shields.io/pypi/v/v4l2py.svg
 [pypi-status]: https://img.shields.io/pypi/status/v4l2py.svg
 [license]: https://img.shields.io/pypi/l/v4l2py.svg
+[CI]: https://github.com/tiagocoutinho/v4l2py/actions/workflows/ci.yml/badge.svg
