@@ -787,6 +787,24 @@ class Controls(dict):
                 return v
         raise KeyError(key)
 
+    def used_classes(self):
+        return set([v.control_class for v in self.values() if isinstance(v, Control)])
+
+    def with_class(self, control_class):
+        if isinstance(control_class, ControlClass):
+            pass
+        elif isinstance(control_class, str):
+            cl = [c for c in ControlClass if c.name == control_class.upper()]
+            if len(cl) != 1:
+                raise ValueError(f"{control_class} is no valid ControlClass")
+            control_class = cl[0]
+        else:
+            raise TypeError(f"control_class expected as ControlClass or str, not {control_class.__class__.__name__}")
+
+        for v in self.values():
+            if isinstance(v, Control) and (v.control_class == control_class):
+                yield v
+
 
 class MenuItem:
     def __init__(self, item):
@@ -805,6 +823,7 @@ class Control:
         self.id = self.info.id
         self.name = info.name.decode()
         self._config_name = None
+        self.control_class = ControlClass(raw.V4L2_CTRL_ID2CLASS(self.id))
         self.type = ControlType(self.info.type)
         try:
             self.standard = ControlID(self.id)
