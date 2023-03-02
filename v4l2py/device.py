@@ -875,7 +875,13 @@ class Control:
             raise AttributeError(f"Control {self.config_name} is read-only")
         if self.is_inactive:
             raise AttributeError(f"Control {self.config_name} is currently inactive")
-        set_control(self.device, self.id, value)
+        if value < self.info.minimum:
+            v = self.info.minimum
+        elif value > self.info.maximum:
+            v = self.info.maximum
+        else:
+            v = value
+        set_control(self.device, self.id, v)
 
     @property
     def is_readable(self):
@@ -892,6 +898,21 @@ class Control:
     @property
     def is_grabbed(self):
         return self.info.flags & ControlFlag.GRABBED
+
+    def set_to_minimum(self):
+        self.value = self.info.minimum
+
+    def set_to_default(self):
+        self.value = self.info.default_value
+
+    def set_to_maximum(self):
+        self.value = self.info.maximum
+
+    def increase(self, steps: int = 1):
+        self.value += (steps * self.info.step)
+
+    def decrease(self, steps: int = 1):
+        self.value -= (steps * self.info.step)
 
 
 class DeviceHelper:
