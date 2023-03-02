@@ -871,10 +871,11 @@ class Control:
 
     @value.setter
     def value(self, value):
-        if self.is_writeable:
-            set_control(self.device, self.id, value)
-        else:
+        if not self.is_writeable:
             raise AttributeError(f"Control {self.config_name} is read-only")
+        if self.is_inactive:
+            raise AttributeError(f"Control {self.config_name} is currently inactive")
+        set_control(self.device, self.id, value)
 
     @property
     def is_readable(self):
@@ -883,6 +884,14 @@ class Control:
     @property
     def is_writeable(self):
         return not (self.info.flags & ControlFlag.READ_ONLY)
+
+    @property
+    def is_inactive(self):
+        return self.info.flags & ControlFlag.INACTIVE
+
+    @property
+    def is_grabbed(self):
+        return self.info.flags & ControlFlag.GRABBED
 
 
 class DeviceHelper:
