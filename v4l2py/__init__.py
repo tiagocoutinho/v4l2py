@@ -16,4 +16,4 @@ from .device import (
 )
 from .io import IO, GeventIO
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
