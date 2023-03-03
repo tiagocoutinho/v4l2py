@@ -145,7 +145,7 @@ app = flask.Flask('basic-web-cam')
 def gen_frames():
     with Device.from_id(0) as cam:
         for frame in cam:
-            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame.data + b"\r\n"
 
 @app.route("/")
 def index():
@@ -166,6 +166,30 @@ $ FLASK_APP=web flask run -h 0.0.0.0
 Point your browser to [127.0.0.1:5000](http://127.0.0.1:5000) and you should see
 your camera rolling!
 
+## Migrating from 1.x to 2
+
+A frame changed from a simple bytes object to a Frame which contains
+the data plus all frame metadata.
+
+As a consequence, when migrating from 1.x to 2, you will need to cast
+frame object with `bytes` or access the `frame.data` item:
+
+Before:
+
+```python
+with Device.from_id(0) as cam:
+    for frame in cam:
+        buff = io.BytesIO(frame)
+```
+
+Now:
+
+```python
+with Device.from_id(0) as cam:
+    for frame in cam:
+        frame = bytes(frame)  # or frame = frame.data
+        buff = io.BytesIO(frame)
+```
 
 ## References
 
