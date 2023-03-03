@@ -6,6 +6,7 @@
 
 from .device import (
     Device,
+    Frame,
     VideoCapture,
     MemoryMap,
     iter_video_files,
