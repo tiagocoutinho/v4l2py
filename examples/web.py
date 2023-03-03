@@ -20,7 +20,7 @@ SUFFIX = b"\r\n"
 def gen_frames():
     with Device.from_id(0) as device:
         for frame in device:
-            yield b"".join((PREFIX, frame, SUFFIX))
+            yield b"".join((PREFIX, bytes(frame), SUFFIX))
 
 
 @app.get("/")
