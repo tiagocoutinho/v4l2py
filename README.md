@@ -52,7 +52,7 @@ frame #10: 40662 bytes
 Getting information about the device:
 
 ```python
->>> from v4l2py import Device
+>>> from v4l2py.device import Device, BufferType
 
 >>> cam = Device.from_id(0)
 >>> cam.open()
@@ -68,7 +68,7 @@ Getting information about the device:
  ImageFormat(type=<BufferType.VIDEO_CAPTURE: 1>, description=b'YUYV 4:2:2',
              flags=<ImageFormatFlag.0: 0>, pixelformat=<PixelFormat.YUYV: 1448695129>)]
 
->>> cam.video_capture.get_format()
+>>> cam.get_format(BufferType.VIDEO_CAPTURE)
 Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 
 >>> for ctrl in cam.controls.values(): print(ctrl)
@@ -112,7 +112,7 @@ $ python
 
 >>> from v4l2py import Device, GeventIO
 >>> with Device.from_id(0, io=GeventIO) as camera:
-...     async for frame in camera:
+...     for frame in camera:
 ...         print(f"frame {len(frame)}")
 frame 10224
 frame 10304
