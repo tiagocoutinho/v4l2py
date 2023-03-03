@@ -177,7 +177,7 @@ def buffer_to_frame(data: bytes, format: Format, output="jpeg"):
 
 def to_frame(data, type="avif", boundary=BOUNDARY):
     header = HEADER.format(type=type, boundary=boundary, length=len(data)).encode()
-    return b"".join((header, data, SUFFIX))
+    return b"".join((header, bytes(data), SUFFIX))
 
 
 @app.get("/")
