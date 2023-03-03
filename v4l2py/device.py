@@ -901,7 +901,7 @@ class Frame:
         return self.data[index]
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} width={self.width}, height={self.height}, format={self.pixel_format.name}, frame={self.frame}, timestamp={self.timestamp}>"
+        return f"<{type(self).__name__} width={self.width}, height={self.height}, format={self.pixel_format.name}, frame_nb={self.frame_nb}, timestamp={self.timestamp}>"
 
     @property
     def width(self):
