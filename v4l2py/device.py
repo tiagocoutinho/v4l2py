@@ -805,6 +805,16 @@ class Controls(dict):
             if isinstance(v, Control) and (v.control_class == control_class):
                 yield v
 
+    def set_to_default(self):
+        for v in self.values():
+            if not isinstance(v, Control):
+                continue
+
+            try:
+                v.set_to_default()
+            except AttributeError:
+                pass
+
 
 class MenuItem:
     def __init__(self, item):
