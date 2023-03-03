@@ -429,7 +429,9 @@ def free_buffers(
     return req
 
 
-def set_format(fd, buffer_type, width, height, pixel_format="MJPG"):
+def set_format(
+    fd, buffer_type: BufferType, width: int, height: int, pixel_format: str = "MJPG"
+):
     f = raw.v4l2_format()
     if isinstance(pixel_format, str):
         pixel_format = raw.v4l2_fourcc(*pixel_format.upper())
@@ -727,7 +729,13 @@ class Device(ReentrantContextManager):
     ) -> typing.List[raw.v4l2_buffer]:
         return enqueue_buffers(self.fileno(), buffer_type, memory, count)
 
-    def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
+    def set_format(
+        self,
+        buffer_type: BufferType,
+        width: int,
+        height: int,
+        pixel_format: str = "MJPG",
+    ):
         return set_format(
             self.fileno(), buffer_type, width, height, pixel_format=pixel_format
         )
