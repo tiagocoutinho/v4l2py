@@ -829,6 +829,13 @@ class MenuItem:
         return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
+def config_name(name: str) -> str:
+    res = name.lower()
+    for r in (", ", " "):
+        res = res.replace(r, "_")
+    return res
+
+
 class Control:
     def __init__(self, device, info):
         self.device = device
