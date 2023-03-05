@@ -9,14 +9,15 @@ def main():
     logging.basicConfig(level="INFO", format=fmt)
 
     with Device.from_id(0) as stream:
-        last = time.monotonic()
+        start = last = time.monotonic()
         last_update = 0
-        for i, frame in enumerate(stream):
+        for frame in stream:
             new = time.monotonic()
             fps, last = 1 / (new - last), new
             if new - last_update > 0.1:
+                elapsed = new - start
                 print(
-                    f"frame {i:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps",
+                    f"frame {frame.frame_nb:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps; {elapsed=:.2f} s;",
                     end="\r",
                 )
                 last_update = new

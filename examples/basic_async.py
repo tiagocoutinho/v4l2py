@@ -22,19 +22,18 @@ async def main():
         capture = VideoCapture(device)
         capture.set_format(640, 480, "MJPG")
         with capture as stream:
-            last = time.monotonic()
+            start = last = time.monotonic()
             last_update = 0
-            i = 0
             async for frame in stream:
                 new = time.monotonic()
                 fps, last = 1 / (new - last), new
                 if new - last_update > 0.1:
+                    elapsed = new - start
                     print(
-                        f"frame {i:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps ; data={data[0]}",
+                        f"frame {frame.frame_nb:04d} {len(frame)/1000:.1f} Kb at {fps:.1f} fps ; data={data[0]}; {elapsed=:.2f} s;",
                         end="\r",
                     )
                     last_update = new
-                i += 1
 
 
 try:
