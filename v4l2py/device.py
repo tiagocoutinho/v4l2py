@@ -45,6 +45,7 @@ def _enum(name, prefix, klass=enum.IntEnum):
 Capability = _enum("Capability", "V4L2_CAP_", klass=enum.IntFlag)
 PixelFormat = _enum("PixelFormat", "V4L2_PIX_FMT_")
 BufferType = _enum("BufferType", "V4L2_BUF_TYPE_")
+BufferFlag = _enum("BufferFlag", "V4L2_BUF_FLAG_", klass=enum.IntFlag)
 Memory = _enum("Memory", "V4L2_MEMORY_")
 ImageFormatFlag = _enum("ImageFormatFlag", "V4L2_FMT_FLAG_", klass=enum.IntFlag)
 Field = _enum("Field", "V4L2_FIELD_")
@@ -60,6 +61,8 @@ ControlID = _enum("ControlID", "V4L2_CID_")
 ControlFlag = _enum("ControlFlag", "V4L2_CTRL_FLAG_")
 SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 Priority = _enum("Priority", "V4L2_PRIORITY_")
+TimeCode = _enum("TimeCode", "V4L2_TC_TYPE_")
+TimeFlag = _enum("TimeFlag", "V4L2_TC_FLAG_", klass=enum.IntFlag)
 
 
 def human_pixel_format(ifmt):
@@ -1001,6 +1004,88 @@ class BufferManager(DeviceHelper):
         self.device.write(data)
 
 
+class Frame:
+    __slots__ = ["format", "buff", "data"]
+
+    def __init__(self, data: bytes, buff: raw.v4l2_buffer, format: Format):
+        self.format = format
+        self.buff = buff
+        self.data = data
+
+    def __bytes__(self):
+        return self.data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} width={self.width}, height={self.height}, format={self.pixel_format.name}, frame_nb={self.frame_nb}, timestamp={self.timestamp}>"
+
+    @property
+    def width(self):
+        return self.format.width
+
+    @property
+    def height(self):
+        return self.format.height
+
+    @property
+    def nbytes(self):
+        return self.buff.bytesused
+
+    @property
+    def pixel_format(self):
+        return PixelFormat(self.format.pixel_format)
+
+    @property
+    def index(self):
+        return self.buff.index
+
+    @property
+    def type(self):
+        return BufferType(self.buff.type)
+
+    @property
+    def flags(self):
+        return BufferFlag(self.buff.flags)
+
+    @property
+    def timestamp(self):
+        return self.buff.timestamp.secs + self.buff.timestamp.usecs * 1e-3
+
+    @property
+    def frame_nb(self):
+        return self.buff.sequence
+
+    @property
+    def memory(self):
+        return Memory(self.buff.memory)
+
+    @property
+    def time_type(self):
+        if BufferFlag.TIMECODE in self.flags:
+            return TimeCode(self.buff.timecode.type)
+
+    @property
+    def time_flags(self):
+        if BufferFlag.TIMECODE in self.flags:
+            return TimeFlag(self.buff.timecode.flags)
+
+    @property
+    def time_frame(self):
+        if BufferFlag.TIMECODE in self.flags:
+            return self.buff.timecode.frames
+
+    @property
+    def array(self):
+        import numpy
+
+        return numpy.frombuffer(bytes(self), dtype="u1")
+
+
 class VideoCapture(BufferManager):
     def __init__(self, device: Device, size: int = 2):
         super().__init__(device, BufferType.VIDEO_CAPTURE, size)
@@ -1067,6 +1152,7 @@ class MemoryMap(ReentrantContextManager):
             buffers = self.buffer_manager.create_buffers(Memory.MMAP)
             self.buffers = [mmap_from_buffer(fd, buff) for buff in buffers]
             self.buffer_manager.enqueue_buffers(Memory.MMAP)
+            self.format = self.buffer_manager.get_format()
             self.buffer_manager.device.log.info("Buffers reserved")
 
     def close(self):
@@ -1076,11 +1162,16 @@ class MemoryMap(ReentrantContextManager):
                 mem.close()
             self.buffer_manager.free_buffers(Memory.MMAP)
             self.buffers = None
+            self.format = None
             self.buffer_manager.device.log.info("Buffers freed")
 
-    def raw_read(self):
+    def raw_grab(self):
         with self.reader as buff:
-            return self.buffers[buff.index][: buff.bytesused]
+            return self.buffers[buff.index][: buff.bytesused], buff
+
+    def raw_read(self):
+        data, buff = self.raw_grab()
+        return Frame(data, buff, self.format)
 
     def wait_read(self):
         device = self.buffer_manager.device

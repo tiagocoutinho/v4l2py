@@ -664,6 +664,8 @@ class v4l2_buffer(ctypes.Structure):
         _fields_ = [
             ("offset", ctypes.c_uint32),  # V4L2_MEMORY_MMAP
             ("userptr", ctypes.c_ulong),  # V4L2_MEMORY_USERPTR
+            # TODO: ("planes", ctypes.POINTER(v4l2_plane)),
+            ("fd", ctypes.c_int),  # V4L2_MEMORY_DMABUF
         ]
 
     _fields_ = [
@@ -678,11 +680,12 @@ class v4l2_buffer(ctypes.Structure):
         ("memory", v4l2_memory),
         ("m", _u),
         ("length", ctypes.c_uint32),
-        ("input", ctypes.c_uint32),
-        ("reserved", ctypes.c_uint32),
+        ("reserved2", ctypes.c_uint32),
+        ("request_fd", ctypes.c_uint32),  # V4L2_BUF_FLAG_REQUEST_FD
     ]
 
 
+V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN = 0x00000000
 V4L2_BUF_FLAG_MAPPED = 0x0001
 V4L2_BUF_FLAG_QUEUED = 0x0002
 V4L2_BUF_FLAG_DONE = 0x0004
@@ -690,7 +693,18 @@ V4L2_BUF_FLAG_KEYFRAME = 0x0008
 V4L2_BUF_FLAG_PFRAME = 0x0010
 V4L2_BUF_FLAG_BFRAME = 0x0020
 V4L2_BUF_FLAG_TIMECODE = 0x0100
-V4L2_BUF_FLAG_INPUT = 0x0200
+V4L2_BUF_FLAG_PREPARED = 0x400
+V4L2_BUF_FLAG_NO_CACHE_INVALIDATE = 0x800
+V4L2_BUF_FLAG_NO_CACHE_CLEAN = 0x1000
+V4L2_BUF_FLAG_M2M_HOLD_CAPTURE_BUF = 0x200
+V4L2_BUF_FLAG_LAST = 0x100000
+V4L2_BUF_FLAG_REQUEST_FD = 0x800000
+V4L2_BUF_FLAG_TIMESTAMP_MASK = 0xE000
+V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC = 0x2000
+V4L2_BUF_FLAG_TIMESTAMP_COPY = 0x4000
+V4L2_BUF_FLAG_TSTAMP_SRC_MASK = 0x70000
+V4L2_BUF_FLAG_TSTAMP_SRC_EOF = 0x0
+V4L2_BUF_FLAG_TSTAMP_SRC_SOE = 0x10000
 
 
 #

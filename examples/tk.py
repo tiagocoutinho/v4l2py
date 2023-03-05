@@ -18,7 +18,10 @@ logging.basicConfig(level="INFO", format=fmt)
 
 
 def frame():
-    return ImageTk.PhotoImage(Image.open(BytesIO(next(stream)), formats=["JPEG"]))
+    frame = next(stream)
+    buff = BytesIO(bytes(frame))
+    image = Image.open(buff, formats=["JPEG"])
+    return ImageTk.PhotoImage(image)
 
 
 def update(cam, mask=None):
