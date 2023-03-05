@@ -72,15 +72,33 @@ Getting information about the device:
 Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 
 >>> for ctrl in cam.controls.values(): print(ctrl)
-<Control name=Brightness, type=INTEGER, min=0, max=255, step=1>
-<Control name=Contrast, type=INTEGER, min=0, max=255, step=1>
-<Control name=Saturation, type=INTEGER, min=0, max=100, step=1>
-<Control name=Hue, type=INTEGER, min=-180, max=180, step=1>
-<Control name=Gamma, type=INTEGER, min=90, max=150, step=1>
-<Control name=White Balance Temperature, type=INTEGER, min=2800, max=6500, step=1>
-<Control name=Sharpness, type=INTEGER, min=0, max=7, step=1>
-<Control name=Backlight Compensation, type=INTEGER, min=0, max=2, step=1>
-<Control name=Exposure (Absolute), type=INTEGER, min=4, max=1250, step=1>
+<Control brightness type=integer min=0 max=255 step=1 default=128 value=64>
+<Control contrast type=integer min=0 max=255 step=1 default=32 value=32>
+<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
+<Control hue type=integer min=-180 max=180 step=1 default=0 value=0>
+<Control white_balance_automatic type=boolean default=1 value=1>
+<Control gamma type=integer min=90 max=150 step=1 default=120 value=120>
+<Control gain type=integer min=1 max=7 step=1 default=1 value=1>
+<Control power_line_frequency type=menu min=0 max=2 step=1 default=2 value=2>
+<Control white_balance_temperature type=integer min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<Control sharpness type=integer min=0 max=7 step=1 default=2 value=2>
+<Control backlight_compensation type=integer min=0 max=1 step=1 default=0 value=0>
+<Control auto_exposure type=menu min=0 max=3 step=1 default=3 value=3>
+<Control exposure_time_absolute type=integer min=10 max=333 step=1 default=156 value=156 flags=inactive>
+<Control exposure_dynamic_framerate type=boolean default=0 value=1>```
+
+>>> cam.controls["saturation"]
+<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
+>>> cam.controls["saturation"].id
+9963778
+>>> cam.controls[9963778]
+<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
+
+>>> cam.controls.brightness
+<Control brightness type=integer min=0 max=255 step=1 default=128 value=64>
+>>> cam.controls.brightness.value = 128
+>>> cam.controls.brightness
+<Control brightness type=integer min=0 max=255 step=1 default=128 value=128>
 ```
 
 ### asyncio
