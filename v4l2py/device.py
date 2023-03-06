@@ -1061,7 +1061,7 @@ class Frame:
 
     @property
     def timestamp(self):
-        return self.buff.timestamp.secs + self.buff.timestamp.usecs * 1e-3
+        return self.buff.timestamp.secs+self.buff.timestamp.usecs*1e-6
 
     @property
     def frame_nb(self):
