@@ -11,6 +11,7 @@ from .device import (
     Frame,
     VideoCapture,
     MemoryMap,
+    PixelFormat,
     iter_video_files,
     iter_video_capture_files,
     iter_devices,
