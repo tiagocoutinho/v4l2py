@@ -15,7 +15,7 @@ with open("README.md") as f:
 
 setup(
     name="v4l2py",
-    version="2.0.1",
+    version="2.1.0",
     author="Jose Tiago Macara Coutinho",
     author_email="coutinhotiago@gmail.com",
     license="GPLv3",

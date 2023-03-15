@@ -429,7 +429,9 @@ def free_buffers(
     return req
 
 
-def set_format(fd, buffer_type, width, height, pixel_format="MJPG"):
+def set_format(
+    fd, buffer_type: BufferType, width: int, height: int, pixel_format: str = "MJPG"
+):
     f = raw.v4l2_format()
     if isinstance(pixel_format, str):
         pixel_format = raw.v4l2_fourcc(*pixel_format.upper())
@@ -727,7 +729,13 @@ class Device(ReentrantContextManager):
     ) -> typing.List[raw.v4l2_buffer]:
         return enqueue_buffers(self.fileno(), buffer_type, memory, count)
 
-    def set_format(self, buffer_type, width, height, pixel_format="MJPG"):
+    def set_format(
+        self,
+        buffer_type: BufferType,
+        width: int,
+        height: int,
+        pixel_format: str = "MJPG",
+    ):
         return set_format(
             self.fileno(), buffer_type, width, height, pixel_format=pixel_format
         )
@@ -1135,27 +1143,39 @@ class MemoryMap(ReentrantContextManager):
         self.buffers = None
         self.reader = QueueReader(buffer_manager, Memory.MMAP)
 
+    @property
+    def device(self) -> Device:
+        return self.buffer_manager.device
+
     def __iter__(self):
         while True:
             yield self.read()
 
     async def __aiter__(self):
-        device = self.buffer_manager.device
+        device = self.device
         loop = asyncio.get_event_loop()
         event = asyncio.Event()
-        loop.add_reader(device.fileno(), event.set)
+        frame = None
+
+        def cb():
+            nonlocal frame
+            frame = self.raw_read()
+            event.set()
+
+        loop.add_reader(device, cb)
         try:
             while True:
                 await event.wait()
                 event.clear()
-                yield self.read()
+                yield frame
+                frame = None
         finally:
-            loop.remove_reader(device.fileno())
+            loop.remove_reader(device)
 
     def open(self):
         if self.buffers is None:
-            self.buffer_manager.device.log.info("Reserving buffers...")
-            fd = self.buffer_manager.device.fileno()
+            self.device.log.info("Reserving buffers...")
+            fd = self.device.fileno()
             buffers = self.buffer_manager.create_buffers(Memory.MMAP)
             self.buffers = [mmap_from_buffer(fd, buff) for buff in buffers]
             self.buffer_manager.enqueue_buffers(Memory.MMAP)
@@ -1164,13 +1184,13 @@ class MemoryMap(ReentrantContextManager):
 
     def close(self):
         if self.buffers:
-            self.buffer_manager.device.log.info("Freeing buffers...")
+            self.device.log.info("Freeing buffers...")
             for mem in self.buffers:
                 mem.close()
             self.buffer_manager.free_buffers(Memory.MMAP)
             self.buffers = None
             self.format = None
-            self.buffer_manager.device.log.info("Buffers freed")
+            self.device.log.info("Buffers freed")
 
     def raw_grab(self):
         with self.reader as buff:
@@ -1181,15 +1201,16 @@ class MemoryMap(ReentrantContextManager):
         return Frame(data, buff, self.format)
 
     def wait_read(self):
-        device = self.buffer_manager.device
-        device.io.select((device,), (), ())
+        device = self.device
+        if device.io.select is not None:
+            device.io.select((device,), (), ())
         return self.raw_read()
 
     def read(self):
         # first time we check what mode device was opened (blocking vs non-blocking)
         # if file was opened with O_NONBLOCK: DQBUF will not block until a buffer
         # is available for read. So we need to do it here
-        if self.buffer_manager.device.is_blocking:
+        if self.device.is_blocking:
             self.read = self.raw_read
         else:
             self.read = self.wait_read

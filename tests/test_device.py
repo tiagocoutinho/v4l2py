@@ -64,6 +64,7 @@ class Hardware:
                 raise OSError(EINVAL, "ups!")
             arg.name = b"brightness"
             arg.type = raw.V4L2_CTRL_TYPE_INTEGER
+            arg.id = 9963776
         elif isinstance(arg, raw.v4l2_capability):
             arg.driver = self.driver
             arg.card = self.card
