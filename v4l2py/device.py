@@ -1152,17 +1152,25 @@ class MemoryMap(ReentrantContextManager):
             yield self.read()
 
     async def __aiter__(self):
-        device = self.buffer_manager.device
+        device = self.device
         loop = asyncio.get_event_loop()
         event = asyncio.Event()
-        loop.add_reader(device.fileno(), event.set)
+        frame = None
+
+        def cb():
+            nonlocal frame
+            frame = self.raw_read()
+            event.set()
+
+        loop.add_reader(device, cb)
         try:
             while True:
                 await event.wait()
                 event.clear()
-                yield self.read()
+                yield frame
+                frame = None
         finally:
-            loop.remove_reader(device.fileno())
+            loop.remove_reader(device)
 
     def open(self):
         if self.buffers is None:
