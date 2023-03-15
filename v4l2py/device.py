@@ -18,6 +18,8 @@ import os
 import pathlib
 import typing
 
+from io import IOBase
+
 from . import raw
 from .io import IO, fopen
 
@@ -642,7 +644,7 @@ class Device(ReentrantContextManager):
             filename = pathlib.Path(name_or_file)
             self._read_write = read_write
             self._fobj = None
-        elif isinstance(name_or_file, str):
+        elif isinstance(name_or_file, IOBase):
             filename = pathlib.Path(name_or_file.name)
             self._read_write = "+" in name_or_file.mode
             self._fobj = name_or_file
@@ -650,7 +652,7 @@ class Device(ReentrantContextManager):
             self._context_level += 1
             self._init()
         else:
-            raise TypeError("name_or_file must be str or a file object")
+            raise TypeError(f"name_or_file must be str or a file-like object, not {name_or_file.__class__.__name__}")
         self.log = log.getChild(filename.stem)
         self.filename = filename
         self.index = device_number(filename)
