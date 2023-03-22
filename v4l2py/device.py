@@ -872,7 +872,7 @@ class Control:
         if self.type != ControlType.BOOLEAN:
             repr += f" min={self.info.minimum} max={self.info.maximum} step={self.info.step}"
         repr += f" default={self.info.default_value}"
-        if not (self.info.flags & ControlFlag.WRITE_ONLY):
+        if not self.is_writeonly:
             repr += f" value={self.value}"
 
         flags = [flag.name.lower() for flag in ControlFlag if (self.info.flags & flag)]
@@ -894,14 +894,14 @@ class Control:
 
     @property
     def value(self):
-        if self.is_readable:
+        if not self.is_writeonly:
             return get_control(self.device, self.id)
         else:
             return None
 
     @value.setter
     def value(self, value):
-        if not self.is_writeable:
+        if self.is_readonly:
             raise AttributeError(f"Control {self.config_name} is read-only")
         if self.is_inactive:
             raise AttributeError(f"Control {self.config_name} is currently inactive")
@@ -914,12 +914,12 @@ class Control:
         set_control(self.device, self.id, v)
 
     @property
-    def is_readable(self):
-        return not (self.info.flags & ControlFlag.WRITE_ONLY)
+    def is_writeonly(self):
+        return (self.info.flags & ControlFlag.WRITE_ONLY)
 
     @property
-    def is_writeable(self):
-        return not (self.info.flags & ControlFlag.READ_ONLY)
+    def is_readonly(self):
+        return (self.info.flags & ControlFlag.READ_ONLY)
 
     @property
     def is_inactive(self):
