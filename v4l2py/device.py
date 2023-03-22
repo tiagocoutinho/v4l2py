@@ -915,19 +915,19 @@ class Control:
 
     @property
     def is_writeonly(self):
-        return (self.info.flags & ControlFlag.WRITE_ONLY)
+        return (self.info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
 
     @property
     def is_readonly(self):
-        return (self.info.flags & ControlFlag.READ_ONLY)
+        return (self.info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
 
     @property
     def is_inactive(self):
-        return self.info.flags & ControlFlag.INACTIVE
+        return (self.info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
 
     @property
     def is_grabbed(self):
-        return self.info.flags & ControlFlag.GRABBED
+        return (self.info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
 
     def set_to_minimum(self):
         self.value = self.info.minimum
