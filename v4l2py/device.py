@@ -926,6 +926,10 @@ class Control:
         return (self.info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
 
     @property
+    def is_writeable(self):
+        return (not self.is_readonly and not self.is_inactive)
+
+    @property
     def is_grabbed(self):
         return (self.info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
 
