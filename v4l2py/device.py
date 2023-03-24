@@ -638,7 +638,7 @@ class Device(ReentrantContextManager):
     def __init__(self, name_or_file, read_write=True, io=IO):
         super().__init__()
         self.info = None
-        self.controls = Controls()
+        self.controls = None
         self.io = io
         if isinstance(name_or_file, (str, pathlib.Path)):
             filename = pathlib.Path(name_or_file)
@@ -675,7 +675,7 @@ class Device(ReentrantContextManager):
 
     def _init(self):
         self.info = read_info(self.fileno())
-        self.controls = Controls({ctrl.id: Control(self, ctrl) for ctrl in self.info.controls})
+        self.controls = Controls.from_device(self)
 
     def open(self):
         if not self._fobj:
@@ -778,6 +778,13 @@ class Device(ReentrantContextManager):
 
 
 class Controls(dict):
+    @classmethod
+    def from_device(cls, device):
+        ctrl_dict = dict()
+        for ctrl in device.info.controls:
+            ctrl_dict[ctrl.id] = Control(device, ctrl)
+        return cls(ctrl_dict)
+
     def __getattr__(self, key):
         try:
             return self[key]
