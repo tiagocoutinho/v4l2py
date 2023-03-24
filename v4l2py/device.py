@@ -901,10 +901,17 @@ class Control:
 
     @value.setter
     def value(self, value):
-        if self.is_readonly:
-            raise AttributeError(f"Control {self.config_name} is read-only")
-        if self.is_inactive:
-            raise AttributeError(f"Control {self.config_name} is currently inactive")
+        if not self.is_writeable:
+            reasons = []
+            if self.is_readonly:
+                reasons.append("read-only")
+            if self.is_inactive:
+                reasons.append("inactive")
+            if self.is_disabled:
+                reasons.append("disabled")
+            if self.is_grabbed:
+                reasons.append("grabbed")
+            raise AttributeError(f"Control {self.config_name} is not writeable: {','.join(reasons)}")
         if value < self.info.minimum:
             v = self.info.minimum
         elif value > self.info.maximum:
@@ -926,12 +933,17 @@ class Control:
         return (self.info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
 
     @property
-    def is_writeable(self):
-        return (not self.is_readonly and not self.is_inactive)
-
-    @property
     def is_grabbed(self):
         return (self.info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
+
+    @property
+    def is_disabled(self):
+        return (self.info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
+
+    @property
+    def is_writeable(self):
+        return not (self.is_readonly or self.is_inactive
+            or self.is_disabled or self.is_grabbed)
 
     def set_to_minimum(self):
         self.value = self.info.minimum
