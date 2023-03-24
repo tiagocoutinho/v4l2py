@@ -943,7 +943,7 @@ class Control:
     @property
     def is_writeable(self):
         return not (self.is_readonly or self.is_inactive
-            or self.is_disabled or self.is_grabbed)
+                    or self.is_disabled or self.is_grabbed)
 
     def set_to_minimum(self):
         self.value = self.info.minimum
