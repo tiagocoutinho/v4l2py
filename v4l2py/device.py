@@ -875,8 +875,8 @@ class Control:
         if not self.is_writeonly:
             repr += f" value={self.value}"
 
-        flags = [flag.name.lower() for flag in ControlFlag if (self.info.flags & flag)]
-        if len(flags):
+        flags = [flag.name.lower() for flag in ControlFlag if ((self.info.flags & flag) == flag)]
+        if flags:
             repr += " flags=" + ",".join(flags)
 
         return f"<{type(self).__name__} {repr}>"
