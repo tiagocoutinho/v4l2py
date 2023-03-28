@@ -782,7 +782,7 @@ class Controls(dict):
     def from_device(cls, device):
         ctrl_dict = dict()
         for ctrl in device.info.controls:
-            ctrl_dict[ctrl.id] = Control(device, ctrl)
+            ctrl_dict[ctrl.id] = LegacyControl(device, ctrl)
         return cls(ctrl_dict)
 
     def __getattr__(self, key):
@@ -803,12 +803,12 @@ class Controls(dict):
 
     def __missing__(self, key):
         for v in self.values():
-            if isinstance(v, Control) and (v.config_name == key):
+            if isinstance(v, BaseControl) and (v.config_name == key):
                 return v
         raise KeyError(key)
 
     def used_classes(self):
-        return set([v.control_class for v in self.values() if isinstance(v, Control)])
+        return set([v.control_class for v in self.values() if isinstance(v, BaseControl)])
 
     def with_class(self, control_class):
         if isinstance(control_class, ControlClass):
@@ -822,12 +822,12 @@ class Controls(dict):
             raise TypeError(f"control_class expected as ControlClass or str, not {control_class.__class__.__name__}")
 
         for v in self.values():
-            if isinstance(v, Control) and (v.control_class == control_class):
+            if isinstance(v, BaseControl) and (v.control_class == control_class):
                 yield v
 
     def set_to_default(self):
         for v in self.values():
-            if not isinstance(v, Control):
+            if not isinstance(v, BaseSingleControl):
                 continue
 
             try:
@@ -846,43 +846,42 @@ class MenuItem:
         return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
-class Control:
+class BaseControl:
     def __init__(self, device, info):
         self.device = device
-        self.info = info
-        self.id = self.info.id
-        self.name = info.name.decode()
+        self._info = info
+        self.id = self._info.id
+        self.name = self._info.name.decode()
         self._config_name = None
         self.control_class = ControlClass(raw.V4L2_CTRL_ID2CLASS(self.id))
-        self.type = ControlType(self.info.type)
+        self.type = ControlType(self._info.type)
         try:
             self.standard = ControlID(self.id)
         except ValueError:
             self.standard = None
-        if self.type == ControlType.MENU:
-            self.menu = {
-                menu.index: MenuItem(menu)
-                for menu in iter_read_menu(self.device._fobj, self)
-            }
-        else:
-            self.menu = {}
 
     def __repr__(self):
-        repr = f"{self.config_name} type={self.type.name.lower()}"
-        if self.type != ControlType.BOOLEAN:
-            repr += f" min={self.info.minimum} max={self.info.maximum} step={self.info.step}"
-        repr += f" default={self.info.default_value}"
+        repr = f"{self.config_name}"
+
+        addrepr = self._get_repr()
+        addrepr = addrepr.strip()
+        if addrepr:
+            repr += f" {addrepr}"
+
         if not self.is_writeonly:
             repr += f" value={self.value}"
 
-        flags = [flag.name.lower() for flag in ControlFlag if ((self.info.flags & flag) == flag)]
+        flags = [flag.name.lower() for flag in ControlFlag if ((self._info.flags & flag) == flag)]
         if flags:
             repr += " flags=" + ",".join(flags)
 
         return f"<{type(self).__name__} {repr}>"
 
+    def _get_repr(self) -> str:
+        return ""
+
     @property
-    def config_name(self):
+    def config_name(self) -> str:
         if self._config_name is None:
             res = self.name.lower()
             for r in ("(", ")"):
@@ -891,6 +890,45 @@ class Control:
                 res = res.replace(r, "_")
             self._config_name = res
         return self._config_name
+
+    @property
+    def is_writeonly(self) -> bool:
+        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
+
+    @property
+    def is_readonly(self) -> bool:
+        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
+
+    @property
+    def is_inactive(self) -> bool:
+        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
+
+    @property
+    def is_grabbed(self) -> bool:
+        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
+
+    @property
+    def is_disabled(self) -> bool:
+        return (self._info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
+
+    @property
+    def is_writeable(self) -> bool:
+        return not (self.is_readonly or self.is_inactive
+                    or self.is_disabled or self.is_grabbed)
+
+
+class BaseSingleControl(BaseControl):
+    def __init__(self, device, info):
+        super().__init__(device, info)
+        self.minimum = self._info.minimum
+        self.maximum = self._info.maximum
+        self.step = self._info.step
+        self.default = self._info.default_value
+
+    def _get_repr(self) -> str:
+        repr = f" min={self.minimum} max={self.maximum}"
+        repr += f" step={self.step} default={self.default}"
+        return repr
 
     @property
     def value(self):
@@ -911,54 +949,53 @@ class Control:
                 reasons.append("disabled")
             if self.is_grabbed:
                 reasons.append("grabbed")
-            raise AttributeError(f"Control {self.config_name} is not writeable: {','.join(reasons)}")
-        if value < self.info.minimum:
-            v = self.info.minimum
-        elif value > self.info.maximum:
-            v = self.info.maximum
+            raise AttributeError(f"Control {self.config_name} is not writeable: {', '.join(reasons)}")
+        if value < self.minimum:
+            v = self.minimum
+        elif value > self.maximum:
+            v = self.maximum
         else:
             v = value
         set_control(self.device, self.id, v)
 
-    @property
-    def is_writeonly(self):
-        return (self.info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
-
-    @property
-    def is_readonly(self):
-        return (self.info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
-
-    @property
-    def is_inactive(self):
-        return (self.info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
-
-    @property
-    def is_grabbed(self):
-        return (self.info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
-
-    @property
-    def is_disabled(self):
-        return (self.info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
-
-    @property
-    def is_writeable(self):
-        return not (self.is_readonly or self.is_inactive
-                    or self.is_disabled or self.is_grabbed)
+    def set_to_default(self):
+        self.value = self.default
 
     def set_to_minimum(self):
-        self.value = self.info.minimum
-
-    def set_to_default(self):
-        self.value = self.info.default_value
+        self.value = self.minimum
 
     def set_to_maximum(self):
-        self.value = self.info.maximum
+        self.value = self.maximum
+
+
+class BaseCompoundControl(BaseControl):
+    def __init__(self, device, info):
+        raise NotImplementedError()
+
+
+class LegacyControl(BaseSingleControl):
+    def __init__(self, device, info):
+        super().__init__(device, info)
+
+        self.info = self._info
+        if self.type == ControlType.MENU:
+            self.menu = {
+                menu.index: MenuItem(menu)
+                for menu in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            self.menu = {}
+
+    def _get_repr(self) -> str:
+        repr = f"type={self.type.name.lower()}"
+        repr += super()._get_repr()
+        return repr
 
     def increase(self, steps: int = 1):
-        self.value += (steps * self.info.step)
+        self.value += (steps * self.step)
 
     def decrease(self, steps: int = 1):
-        self.value -= (steps * self.info.step)
+        self.value -= (steps * self.step)
 
 
 class DeviceHelper:
