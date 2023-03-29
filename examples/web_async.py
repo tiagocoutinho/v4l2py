@@ -10,6 +10,8 @@
 # run from this directory with:
 # uvicorn web_async:app
 
+"""A simple ASGI web server showing camera output"""
+
 import logging
 
 import fastapi.responses
@@ -19,6 +21,15 @@ from v4l2py import Device, VideoCapture
 
 PREFIX = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
 SUFFIX = b"\r\n"
+INDEX = """\
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+</head>
+<body><img src="/stream" /></body>
+</html>
+"""
 
 app = fastapi.FastAPI()
 
@@ -31,7 +42,7 @@ logging.basicConfig(
 async def gen_frames():
     with Device.from_id(0) as device:
         capture = VideoCapture(device)
-        capture.set_format(1280, 720, "MJPG")
+        capture.set_format(640, 480, "MJPG")
         with capture as stream:
             async for frame in stream:
                 yield b"".join((PREFIX, bytes(frame), SUFFIX))
@@ -39,7 +50,7 @@ async def gen_frames():
 
 @app.get("/")
 def index():
-    return fastapi.responses.HTMLResponse('<html><img src="/stream" /></html>')
+    return fastapi.responses.HTMLResponse(INDEX)
 
 
 @app.get("/stream")

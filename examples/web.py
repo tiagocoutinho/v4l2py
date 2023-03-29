@@ -15,6 +15,15 @@ app = flask.Flask("basic-web-cam")
 
 PREFIX = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
 SUFFIX = b"\r\n"
+INDEX = """\
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+</head>
+<body><img src="/stream" /></body>
+</html>
+"""
 
 
 def gen_frames():
@@ -25,7 +34,7 @@ def gen_frames():
 
 @app.get("/")
 def index():
-    return '<html><img src="/stream" /></html>'
+    return INDEX
 
 
 @app.get("/stream")
@@ -33,6 +42,3 @@ def stream():
     return flask.Response(
         gen_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
     )
-
-
-app.run(host="0.0.0.0")
