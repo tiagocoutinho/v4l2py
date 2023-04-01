@@ -155,21 +155,20 @@ def cameras() -> list[Camera]:
 
 
 def buffer_to_frame_maker(format: Format, output="jpeg"):
-    match (format.pixel_format, output.lower()):
-        case (PixelFormat.JPEG | PixelFormat.MJPEG, "jpeg"):
-            return functools.partial(to_frame, type="jpeg")
-        case _:
-            return functools.partial(buffer_to_frame, format=format, output=output)
+    if ((output.lower() == "jpeg") and
+            (format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG))):
+        return functools.partial(to_frame, type="jpeg")
+    else:
+        return functools.partial(buffer_to_frame, format=format, output=output)
 
 
 def buffer_to_frame(data: bytes, format: Format, output="jpeg"):
-    match format.pixel_format:
-        case PixelFormat.JPEG | PixelFormat.MJPEG:
-            image = Image.open(io.BytesIO(data))
-        case PixelFormat.GREY:
-            image = Image.frombuffer("L", (format.width, format.height), data)
-        case _:
-            raise ValueError(f"unsupported pixel format {format.pixel_format}")
+    if (format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG)):
+        image = Image.open(io.BytesIO(data))
+    elif (format.pixel_format == PixelFormat.GREY):
+        image = Image.frombuffer("L", (format.width, format.height), data)
+    else:
+        raise ValueError(f"unsupported pixel format {format.pixel_format}")
     buff = io.BytesIO()
     image.save(buff, output)
     return to_frame(buff.getvalue(), type=output)
