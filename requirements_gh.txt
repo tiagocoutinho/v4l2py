@@ -1,2 +1,4 @@
-tox
-tox-gh-actions
+pytest>=6.2.5
+pytest-asyncio>=0.15.1
+pytest-cov>=2.12.1
+ruff>=0.0.261
