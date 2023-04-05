@@ -923,29 +923,57 @@ class BaseControl:
         set_control(self.device, self.id, v)
 
     @property
-    def is_writeonly(self) -> bool:
-        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
-
-    @property
-    def is_readonly(self) -> bool:
-        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
-
-    @property
-    def is_inactive(self) -> bool:
-        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
-
-    @property
-    def is_grabbed(self) -> bool:
-        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
-
-    @property
-    def is_disabled(self) -> bool:
+    def is_flagged_disabled(self) -> bool:
         return (self._info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
 
     @property
+    def is_flagged_grabbed(self) -> bool:
+        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
+
+    @property
+    def is_flagged_read_only(self) -> bool:
+        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
+
+    @property
+    def is_flagged_update(self) -> bool:
+        return (self._info.flags & ControlFlag.UPDATE) == ControlFlag.UPDATE
+
+    @property
+    def is_flagged_inactive(self) -> bool:
+        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
+
+    @property
+    def is_flagged_slider(self) -> bool:
+        return (self._info.flags & ControlFlag.SLIDER) == ControlFlag.SLIDER
+
+    @property
+    def is_flagged_write_only(self) -> bool:
+        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
+
+    @property
+    def is_flagged_volatile(self) -> bool:
+        return (self._info.flags & ControlFlag.VOLATILE) == ControlFlag.VOLATILE
+
+    @property
+    def is_flagged_has_payload(self) -> bool:
+        return (self._info.flags & ControlFlag.HAS_PAYLOAD) == ControlFlag.HAS_PAYLOAD
+
+    @property
+    def is_flagged_execute_on_write(self) -> bool:
+        return (self._info.flags & ControlFlag.EXECUTE_ON_WRITE) == ControlFlag.EXECUTE_ON_WRITE
+
+    @property
+    def is_flagged_modify_layout(self) -> bool:
+        return (self._info.flags & ControlFlag.MODIFY_LAYOUT) == ControlFlag.MODIFY_LAYOUT
+
+    @property
+    def is_flagged_dynamic_array(self) -> bool:
+        return (self._info.flags & ControlFlag.DYNAMIC_ARRAY) == ControlFlag.DYNAMIC_ARRAY
+
+    @property
     def is_writeable(self) -> bool:
-        return not (self.is_readonly or self.is_inactive
-                    or self.is_disabled or self.is_grabbed)
+        return not (self.is_flagged_read_only or self.is_flagged_inactive
+                    or self.is_flagged_disabled or self.is_flagged_grabbed)
 
     def set_to_default(self):
         self.value = self.default
@@ -998,6 +1026,26 @@ class LegacyControl(BaseNumericControl):
         repr = f"type={self.type.name.lower()}"
         repr += super()._get_repr()
         return repr
+
+    @property
+    def is_writeonly(self) -> bool:
+        return self.is_flagged_write_only
+
+    @property
+    def is_readonly(self) -> bool:
+        return self.is_flagged_read_only
+
+    @property
+    def is_inactive(self) -> bool:
+        return self.is_flagged_inactive
+
+    @property
+    def is_grabbed(self) -> bool:
+        return self.is_flagged_grabbed
+
+    @property
+    def is_disabled(self) -> bool:
+        return self.is_flagged_disabled
 
     def increase(self, steps: int = 1):
         self.value += (steps * self.step)
