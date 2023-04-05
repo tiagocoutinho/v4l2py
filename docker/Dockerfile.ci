@@ -1,0 +1,21 @@
+ARG PYTHON_VERSION
+
+FROM python:${PYTHON_VERSION}-alpine
+
+LABEL org.opencontainers.image.source=https://github.com/tiagocoutinho/v4l2py
+LABEL org.opencontainers.image.description="CI image for v4l2py tests on ${PYTHON_VERSION}"
+LABEL org.opencontainers.image.licenses=GPLv3
+
+
+COPY requirements-ci.txt .
+
+RUN pip install -r requirements-ci.txt
+
+
+# Instructions:
+
+# docker login ghcr.io -u tiagocoutinho
+# export PYV=3.11
+# docker build -f docker/Dockerfile.ci --build-arg PYTHON_VERSION=$PYV -t v4l2py-py$PYV:latest .
+# docker tag v4l2py-py$PYV:latest ghcr.io/tiagocoutinho/v4l2py-py$PYV:latest
+# docker push ghcr.io/tiagocoutinho/v4l2py-py$PYV:latest
