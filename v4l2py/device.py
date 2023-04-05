@@ -827,7 +827,7 @@ class Controls(dict):
 
     def set_to_default(self):
         for v in self.values():
-            if not isinstance(v, BaseSingleControl):
+            if not isinstance(v, BaseControl):
                 continue
 
             try:
@@ -855,10 +855,13 @@ class BaseControl:
         self._config_name = None
         self.control_class = ControlClass(raw.V4L2_CTRL_ID2CLASS(self.id))
         self.type = ControlType(self._info.type)
+
         try:
             self.standard = ControlID(self.id)
         except ValueError:
             self.standard = None
+
+        self.default = self._info.default_value
 
     def __repr__(self):
         repr = f"{self.config_name}"
@@ -892,45 +895,6 @@ class BaseControl:
         return self._config_name
 
     @property
-    def is_writeonly(self) -> bool:
-        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
-
-    @property
-    def is_readonly(self) -> bool:
-        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
-
-    @property
-    def is_inactive(self) -> bool:
-        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
-
-    @property
-    def is_grabbed(self) -> bool:
-        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
-
-    @property
-    def is_disabled(self) -> bool:
-        return (self._info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
-
-    @property
-    def is_writeable(self) -> bool:
-        return not (self.is_readonly or self.is_inactive
-                    or self.is_disabled or self.is_grabbed)
-
-
-class BaseSingleControl(BaseControl):
-    def __init__(self, device, info):
-        super().__init__(device, info)
-        self.minimum = self._info.minimum
-        self.maximum = self._info.maximum
-        self.step = self._info.step
-        self.default = self._info.default_value
-
-    def _get_repr(self) -> str:
-        repr = f" min={self.minimum} max={self.maximum}"
-        repr += f" step={self.step} default={self.default}"
-        return repr
-
-    @property
     def value(self):
         if not self.is_writeonly:
             return get_control(self.device, self.id)
@@ -958,8 +922,52 @@ class BaseSingleControl(BaseControl):
             v = value
         set_control(self.device, self.id, v)
 
+    @property
+    def is_writeonly(self) -> bool:
+        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
+
+    @property
+    def is_readonly(self) -> bool:
+        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
+
+    @property
+    def is_inactive(self) -> bool:
+        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
+
+    @property
+    def is_grabbed(self) -> bool:
+        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
+
+    @property
+    def is_disabled(self) -> bool:
+        return (self._info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
+
+    @property
+    def is_writeable(self) -> bool:
+        return not (self.is_readonly or self.is_inactive
+                    or self.is_disabled or self.is_grabbed)
+
     def set_to_default(self):
         self.value = self.default
+
+
+class BaseNumericControl(BaseControl):
+    def __init__(self, device, info):
+        super().__init__(device, info)
+        self.minimum = self._info.minimum
+        self.maximum = self._info.maximum
+        self.step = self._info.step
+
+    def _get_repr(self) -> str:
+        repr = f" min={self.minimum} max={self.maximum}"
+        repr += f" step={self.step} default={self.default}"
+        return repr
+
+    def increase(self, steps: int = 1):
+        self.value += (steps * self.step)
+
+    def decrease(self, steps: int = 1):
+        self.value -= (steps * self.step)
 
     def set_to_minimum(self):
         self.value = self.minimum
@@ -973,7 +981,7 @@ class BaseCompoundControl(BaseControl):
         raise NotImplementedError()
 
 
-class LegacyControl(BaseSingleControl):
+class LegacyControl(BaseNumericControl):
     def __init__(self, device, info):
         super().__init__(device, info)
 
