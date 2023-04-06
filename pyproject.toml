@@ -32,7 +32,7 @@ Source = "https://github.com/tiagocoutinho/v4l2py"
 
 [project.optional-dependencies]
 test = [ 
-	"ward>=0.66",
+	"ward>=0.67.0b0",
 	"ward-coverage>=0.3.0",
 ]
 
