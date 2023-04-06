@@ -135,7 +135,7 @@ def _():
 def _():
     with Hardware() as hw:
         device = Device(hw.filename)
-        hw.fobj is None
+        assert hw.fobj is None
         assert device.closed
         assert device.info is None
         device.open()
