@@ -31,9 +31,21 @@ Homepage = "https://github.com/tiagocoutinho/v4l2py"
 Source = "https://github.com/tiagocoutinho/v4l2py"
 
 [project.optional-dependencies]
+build = [
+    "build>=0.10.0",
+    "twine>=4.0.2",
+]
+dev = [
+    "black>=23.3.0",
+    "build>=0.10.0",
+    "ruff>=0.0.261",
+    "twine>=4.0.2",
+    "ward>=0.67.0b0",
+    "ward-coverage>=0.3.0",
+]
 test = [ 
-	"ward>=0.67.0b0",
-	"ward-coverage>=0.3.0",
+    "ward>=0.67.0b0",
+    "ward-coverage>=0.3.0",
 ]
 
 [build-system]
