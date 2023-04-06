@@ -1151,7 +1151,9 @@ class v4l2_ext_controls(ctypes.Structure):
 
 
 V4L2_CTRL_CLASS_USER = 0x00980000  # Old-style 'user' controls
-V4L2_CTRL_CLASS_MPEG = 0x00990000  # Stateful codec controls (..._CODEC in v4l2-controls.h)
+V4L2_CTRL_CLASS_MPEG = (
+    0x00990000  # Stateful codec controls (..._CODEC in v4l2-controls.h)
+)
 V4L2_CTRL_CLASS_CAMERA = 0x009A0000  # Camera class controls
 V4L2_CTRL_CLASS_FM_TX = 0x009B0000  # FM Modulator controls
 V4L2_CTRL_CLASS_FLASH = 0x009C0000  # Camera flash controls
