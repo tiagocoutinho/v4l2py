@@ -133,7 +133,7 @@ class Camera:
             format = capture.get_format()
             to_frame = buffer_to_frame_maker(format, output=self.frame_type)
             self.last_request = gevent.time.monotonic()
-            for i, data in enumerate(self.device):
+            for data in self.device:
                 self.last_frame = to_frame(data)
                 self.trigger.set()
                 if gevent.time.monotonic() - self.last_request > 10:
@@ -155,17 +155,18 @@ def cameras() -> list[Camera]:
 
 
 def buffer_to_frame_maker(format: Format, output="jpeg"):
-    if ((output.lower() == "jpeg") and
-            (format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG))):
+    if (output.lower() == "jpeg") and (
+        format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG)
+    ):
         return functools.partial(to_frame, type="jpeg")
     else:
         return functools.partial(buffer_to_frame, format=format, output=output)
 
 
 def buffer_to_frame(data: bytes, format: Format, output="jpeg"):
-    if (format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG)):
+    if format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG):
         image = Image.open(io.BytesIO(data))
-    elif (format.pixel_format == PixelFormat.GREY):
+    elif format.pixel_format == PixelFormat.GREY:
         image = Image.frombuffer("L", (format.width, format.height), data)
     else:
         raise ValueError(f"unsupported pixel format {format.pixel_format}")

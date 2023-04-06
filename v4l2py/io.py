@@ -10,7 +10,7 @@ import select
 
 
 def fopen(path, rw=False, blocking=False):
-    kwargs = dict(buffering=0)
+    kwargs = {"buffering": 0}
     if not blocking:
 
         def opener(path, flags):

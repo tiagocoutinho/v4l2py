@@ -5,7 +5,7 @@ from pathlib import Path
 from random import randint
 from unittest import mock
 
-import pytest
+from ward import test, raises
 
 from v4l2py import raw
 from v4l2py.device import (
@@ -73,19 +73,19 @@ class Hardware:
         return 0
 
 
-@pytest.mark.parametrize(
-    "filename, expected",
-    [
-        ("/dev/video0", 0),
-        ("/dev/video1", 1),
-        ("/dev/video999", 999),
-    ],
-)
-def test_device_number(filename, expected):
-    assert device_number(filename) == expected
+for filename, expected in [
+    ("/dev/video0", 0),
+    ("/dev/video1", 1),
+    ("/dev/video999", 999),
+]:
+
+    @test("device number")
+    def _(filename=filename, expected=expected):
+        assert device_number(filename) == expected
 
 
-def test_video_files():
+@test("video files")
+def _():
     with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
         expected_files = ["/dev/video0", "/dev/video55"]
         glob.return_value = expected_files
@@ -93,7 +93,8 @@ def test_video_files():
         assert list(iter_video_files()) == expected_files
 
 
-def test_device_list():
+@test("device list")
+def _():
     assert isgenerator(iter_devices())
 
     with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
@@ -108,7 +109,8 @@ def test_device_list():
         }
 
 
-def test_device_creation():
+@test("device creation")
+def _():
     # This should not raise an error until open() is called
     device = Device("/unknown")
     assert str(device.filename) == "/unknown"
@@ -116,11 +118,12 @@ def test_device_creation():
     assert device.closed
 
     for name in (1, 1.1, True, [], {}, (), set()):
-        with pytest.raises(TypeError):
+        with raises(TypeError):
             Device(name)
 
 
-def test_device_creation_from_id():
+@test("device creation from id")
+def _():
     # This should not raise an error until open() is called
     device = Device.from_id(33)
     assert str(device.filename) == "/dev/video33"
@@ -128,10 +131,11 @@ def test_device_creation_from_id():
     assert device.closed
 
 
-def test_device_open():
+@test("device open")
+def _():
     with Hardware() as hw:
         device = Device(hw.filename)
-        hw.fobj is None
+        assert hw.fobj is None
         assert device.closed
         assert device.info is None
         device.open()
@@ -140,7 +144,8 @@ def test_device_open():
         assert device.fileno() == hw.fd
 
 
-def test_device_info():
+@test("device info")
+def _():
     with Hardware() as hw:
         device = Device(hw.filename)
         device.opener = hw.open
@@ -152,7 +157,8 @@ def test_device_info():
         assert device.info.version == hw.version_str
 
 
-def test_device_repr():
+@test("device repr")
+def _():
     with Hardware() as hw:
         device = Device(hw.filename)
         assert repr(device) == f"<Device name={hw.filename}, closed=True>"
@@ -160,7 +166,8 @@ def test_device_repr():
         assert repr(device) == f"<Device name={hw.filename}, closed=False>"
 
 
-def test_create_video_capture():
+@test("create video capture")
+def _():
     with Hardware() as hw:
         device = Device(hw.filename)
         video_capture = VideoCapture(device)
