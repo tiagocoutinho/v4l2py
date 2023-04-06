@@ -33,7 +33,7 @@ jobs:
         pip install -r requirements_gh.txt
     - name: Linting tests
       run: |
-        black --check --diff --target-version=py37 v4l2py tests
+        black --check --diff v4l2py tests
         ruff check --diff v4l2py tests
     - name: Build package
       run: |
