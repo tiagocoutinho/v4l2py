@@ -14,7 +14,6 @@ import fcntl
 import fractions
 import logging
 import mmap
-import os
 import pathlib
 import typing
 
@@ -705,7 +704,7 @@ class Device(ReentrantContextManager):
 
     @property
     def is_blocking(self):
-        return os.get_blocking(self.fileno())
+        return self._fobj.get_blocking()
 
     def query_buffer(self, buffer_type, memory, index):
         return query_buffer(self.fileno(), buffer_type, memory, index)
