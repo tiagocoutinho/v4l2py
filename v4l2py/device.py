@@ -871,6 +871,7 @@ class BaseControl:
         if addrepr:
             repr += f" {addrepr}"
 
+        repr += f" default={self.default}"
         if not self.is_flagged_write_only:
             repr += f" value={self.value}"
 
@@ -987,8 +988,7 @@ class BaseNumericControl(BaseControl):
         self.step = self._info.step
 
     def _get_repr(self) -> str:
-        repr = f" min={self.minimum} max={self.maximum}"
-        repr += f" step={self.step} default={self.default}"
+        repr = f" min={self.minimum} max={self.maximum} step={self.step}"
         return repr
 
     def increase(self, steps: int = 1):
