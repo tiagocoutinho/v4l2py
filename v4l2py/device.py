@@ -14,7 +14,6 @@ import fcntl
 import fractions
 import logging
 import mmap
-import os
 import pathlib
 import typing
 
@@ -692,10 +691,12 @@ class Device(ReentrantContextManager):
 
     def close(self):
         if not self.closed:
-            self.log.info("closing %s (%s)", self.filename, self.info.card)
+            info = self.info
+            self.log.info("closing %s (%s)", self.filename, info.card)
+            self.info = None
             self._fobj.close()
             self._fobj = None
-            self.log.info("closed %s (%s)", self.filename, self.info.card)
+            self.log.info("closed %s (%s)", self.filename, info.card)
 
     def fileno(self):
         return self._fobj.fileno()
@@ -706,7 +707,7 @@ class Device(ReentrantContextManager):
 
     @property
     def is_blocking(self):
-        return os.get_blocking(self.fileno())
+        return self._fobj.get_blocking()
 
     def query_buffer(self, buffer_type, memory, index):
         return query_buffer(self.fileno(), buffer_type, memory, index)
@@ -1123,7 +1124,7 @@ class VideoCapture(BufferManager):
 
     def __enter__(self):
         self.open()
-        return self.buffer
+        return self
 
     def __exit__(self, *exc):
         self.close()
