@@ -861,8 +861,6 @@ class BaseControl:
         except ValueError:
             self.standard = None
 
-        self.default = self._info.default_value
-
     def __repr__(self):
         repr = f"{self.config_name}"
 
@@ -894,6 +892,10 @@ class BaseControl:
                 res = res.replace(r, "_")
             self._config_name = res
         return self._config_name
+
+    @property
+    def default(self):
+        return self._info.default_value
 
     @property
     def value(self):
