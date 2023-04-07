@@ -871,7 +871,7 @@ class BaseControl:
         if addrepr:
             repr += f" {addrepr}"
 
-        if not self.is_writeonly:
+        if not self.is_flagged_write_only:
             repr += f" value={self.value}"
 
         flags = [flag.name.lower() for flag in ControlFlag if ((self._info.flags & flag) == flag)]
@@ -896,7 +896,7 @@ class BaseControl:
 
     @property
     def value(self):
-        if not self.is_writeonly:
+        if not self.is_flagged_write_only:
             return get_control(self.device, self.id)
         else:
             return None
