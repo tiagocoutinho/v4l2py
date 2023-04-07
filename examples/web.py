@@ -8,7 +8,7 @@
 
 import flask
 
-from v4l2py import Device
+from v4l2py import Device, VideoCapture
 
 app = flask.Flask("basic-web-cam")
 
@@ -28,6 +28,8 @@ INDEX = """\
 
 def gen_frames():
     with Device.from_id(0) as device:
+        capture = VideoCapture(device)
+        capture.set_format(640, 480, "MJPG")
         for frame in device:
             yield b"".join((PREFIX, bytes(frame), SUFFIX))
 
