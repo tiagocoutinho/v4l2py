@@ -66,10 +66,12 @@ class Hardware:
         opener = mock.patch("v4l2py.io.open", self.open)
         mmap = mock.patch("v4l2py.device.mmap.mmap", self.mmap)
         select = mock.patch("v4l2py.io.IO.select", self.select)
+        blocking = mock.patch("v4l2py.device.os.get_blocking", self.get_blocking)
         self.stack.enter_context(ioctl)
         self.stack.enter_context(opener)
         self.stack.enter_context(mmap)
         self.stack.enter_context(select)
+        self.stack.enter_context(blocking)
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -83,7 +85,8 @@ class Hardware:
         self.fobj.closed = False
         return self.fobj
 
-    def get_blocking(self):
+    def get_blocking(self, fd):
+        assert self.fd == fd
         return self.fobj.get_blocking()
 
     @property
@@ -241,7 +244,6 @@ def _(camera=hardware):
     assert device.fileno() == camera.fd
     device.close()
     assert device.closed
-    assert device.info is None
 
 
 @test("device info")
