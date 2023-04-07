@@ -692,12 +692,10 @@ class Device(ReentrantContextManager):
 
     def close(self):
         if not self.closed:
-            info = self.info
-            self.log.info("closing %s (%s)", self.filename, info.card)
-            self.info = None
+            self.log.info("closing %s (%s)", self.filename, self.info.card)
             self._fobj.close()
             self._fobj = None
-            self.log.info("closed %s (%s)", self.filename, info.card)
+            self.log.info("closed %s (%s)", self.filename, self.info.card)
 
     def fileno(self):
         return self._fobj.fileno()
