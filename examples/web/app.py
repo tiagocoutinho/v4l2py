@@ -4,13 +4,17 @@
 # Copyright (c) 2023 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
+# Extra dependencies required to run this example:
+
+# pip install pillow cv2 flask gunicorn gevent
+
 # run from this directory with:
 # gunicorn --bind=0.0.0.0:8000 --log-level=debug --worker-class=gevent app:app
 
-import functools
 import io
 import logging
 
+import cv2
 import flask
 import gevent
 import gevent.event
@@ -18,12 +22,11 @@ import gevent.fileobject
 import gevent.monkey
 import gevent.queue
 import gevent.time
-from PIL import Image
+import PIL.Image
 
 from v4l2py.device import (
     ControlType,
     Device,
-    Format,
     PixelFormat,
     VideoCapture,
     iter_video_capture_devices,
@@ -95,11 +98,14 @@ class Trigger:
 class Camera:
     def __init__(self, device: Device, frame_type="jpeg") -> None:
         self.device: Device = device
+        self.capture = VideoCapture(self.device)
         self.runner: gevent.Greenlet | None = None
         self.last_frame: bytes | None = None
         self.last_request: float = 0.0
         self.trigger: Trigger = Trigger()
         self.frame_type = frame_type
+        with device:
+            self.info = self.device.info
 
     def __iter__(self):
         while True:
@@ -128,13 +134,9 @@ class Camera:
 
     def run(self):
         with self.device:
-            capture = VideoCapture(self.device)
-            capture.set_format(640, 480, "MJPG")
-            format = capture.get_format()
-            to_frame = buffer_to_frame_maker(format, output=self.frame_type)
             self.last_request = gevent.time.monotonic()
-            for data in self.device:
-                self.last_frame = to_frame(data)
+            for frame in self.device:
+                self.last_frame = frame_to_image(frame)
                 self.trigger.set()
                 if gevent.time.monotonic() - self.last_request > 10:
                     log.info("Stopping camera task due to inactivity")
@@ -146,38 +148,37 @@ def cameras() -> list[Camera]:
     if CAMERAS is None:
         cameras = {}
         for device in iter_video_capture_devices(io=GeventIO):
-            with device:
-                # pass just to make it read camera info
-                pass
             cameras[device.index] = Camera(device)
         CAMERAS = cameras
     return CAMERAS
 
 
-def buffer_to_frame_maker(format: Format, output="jpeg"):
-    if (output.lower() == "jpeg") and (
-        format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG)
-    ):
-        return functools.partial(to_frame, type="jpeg")
-    else:
-        return functools.partial(buffer_to_frame, format=format, output=output)
+def frame_to_image(frame, output="jpeg"):
+    match frame.pixel_format:
+        case PixelFormat.JPEG | PixelFormat.MJPEG:
+            if output == "jpeg":
+                return to_image_send(frame.data, type=output)
+            else:
+                buff = io.BytesIO()
+                image = PIL.Image.open(io.BytesIO(frame.data))
+        case PixelFormat.GREY:
+            data = frame.array
+            data.shape = frame.height, frame.width, -1
+            image = PIL.Image.frombuffer("L", (frame.width, frame.height), data)
+        case PixelFormat.YUYV:
+            data = frame.array
+            data.shape = frame.height, frame.width, -1
+            rgb = cv2.cvtColor(data, cv2.COLOR_YUV2RGB_YUYV)
+            image = PIL.Image.fromarray(rgb)
 
-
-def buffer_to_frame(data: bytes, format: Format, output="jpeg"):
-    if format.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG):
-        image = Image.open(io.BytesIO(data))
-    elif format.pixel_format == PixelFormat.GREY:
-        image = Image.frombuffer("L", (format.width, format.height), data)
-    else:
-        raise ValueError(f"unsupported pixel format {format.pixel_format}")
     buff = io.BytesIO()
     image.save(buff, output)
-    return to_frame(buff.getvalue(), type=output)
+    return to_image_send(buff.getvalue(), type=output)
 
 
-def to_frame(data, type="avif", boundary=BOUNDARY):
+def to_image_send(data, type="jpeg", boundary=BOUNDARY):
     header = HEADER.format(type=type, boundary=boundary, length=len(data)).encode()
-    return b"".join((header, bytes(data), SUFFIX))
+    return b"".join((header, data, SUFFIX))
 
 
 @app.get("/")
@@ -190,7 +191,7 @@ def start(device_id):
     camera = cameras()[device_id]
     camera.start()
     return (
-        f'<img src="/camera/{device_id}/stream" width="640" alt="{camera.device.info.card}"/>',
+        f'<img src="/camera/{device_id}/stream" width="640" alt="{camera.info.card}"/>',
         200,
     )
 
@@ -215,6 +216,15 @@ def device(device_id: int):
 def stream(device_id):
     camera = cameras()[device_id]
     return StreamResponse(iter(camera))
+
+
+@app.post("/camera/<int:device_id>/format")
+def set_format(device_id):
+    width, height, fmt = map(int, flask.request.form["value"].split())
+    camera = cameras()[device_id]
+    with camera.device:
+        camera.capture.set_format(width, height, fmt)
+    return "", 204
 
 
 @app.post("/camera/<int:device_id>/control/<int:control_id>")

@@ -1,5 +1,6 @@
 # set index = camera.device.index
-# set name = camera.device.info.card
+# set name = camera.info.card
+# set fmt = camera.capture.get_format()
 <div class="card">
     <h5 class="card-header">{{index}} - {{name}}</h5>
     <div class="row g-0">
@@ -10,6 +11,22 @@
         </div>
         <div class="col-md-12 col-lg-4">
             <div class="card-body">
+                <div class="input-group input-group-sm mb-1" id="frames-{{index}}">
+                    <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg"
+                        name="value"
+                        hx-post="/camera/{{index}}/format"
+                    >
+                    # for ftype in camera.info.frame_sizes:
+                        <option value="{{ftype.width}} {{ftype.height}} {{ftype.pixel_format.value}}"
+                            # if (fmt.width, fmt.height, fmt.pixel_format) == (ftype.width, ftype.height, ftype.pixel_format)
+                            selected
+                            # endif
+                        >
+                            {{ftype.width}}x{{ftype.height}} {{ftype.pixel_format.name}}
+                        </option>
+                # endfor
+                    </select>
+                </div>
                 # for control in camera.device.controls.values():
                 # include "control.html"
                 # endfor

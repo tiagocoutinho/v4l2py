@@ -25,14 +25,14 @@
                  name="value"
                  id="checkbox-{{did}}-{{control.id}}"
                  hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
-                 {{"checked" if value else "" }}
+                 {{"selected" if value else "" }}
             >
             <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
                 {{control.name}}
             </label>
         </div>
     # elif control.type == ControlType.MENU:
-        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example"
+        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg"
             name="value"
             hx-post="/camera/{{did}}/control/{{control.id}}"
         >

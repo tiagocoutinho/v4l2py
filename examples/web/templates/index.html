@@ -19,7 +19,7 @@
             #for index, camera in cameras.items():
                 <li class="nav-item">
                     <a class="nav-link active" hx-get="/camera/{{index}}" hx-target="#camera">
-                       {{camera.device.info.card}}
+                       {{camera.info.card}}
                     </a>
                 </li>
             #endfor
