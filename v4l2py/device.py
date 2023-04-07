@@ -927,12 +927,6 @@ class BaseControl:
             if self.is_grabbed:
                 reasons.append("grabbed")
             raise AttributeError(f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}")
-        if value < self.minimum:
-            v = self.minimum
-        elif value > self.maximum:
-            v = self.maximum
-        else:
-            v = value
         v = self._mangle_write(value)
         v = self._convert_write(v)
         set_control(self.device, self.id, v)
@@ -1004,6 +998,14 @@ class BaseNumericControl(BaseControl):
     def _get_repr(self) -> str:
         repr = f" min={self.minimum} max={self.maximum} step={self.step}"
         return repr
+
+    def _mangle_write(self, value):
+        if value < self.minimum:
+            return self.minimum
+        elif value > self.maximum:
+            return self.maximum
+        else:
+            return value
 
     def increase(self, steps: int = 1):
         self.value += (steps * self.step)
