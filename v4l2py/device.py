@@ -893,16 +893,26 @@ class BaseControl:
             self._config_name = res
         return self._config_name
 
+    def _convert_read(self, value):
+        return value
+
     @property
     def default(self):
-        return self._info.default_value
+        return self._convert_read(self._info.default_value)
 
     @property
     def value(self):
         if not self.is_flagged_write_only:
-            return get_control(self.device, self.id)
+            v = get_control(self.device, self.id)
+            return self._convert_read(v)
         else:
             return None
+
+    def _mangle_write(self, value):
+        return value
+
+    def _convert_write(self, value):
+        return value
 
     @value.setter
     def value(self, value):
@@ -923,6 +933,8 @@ class BaseControl:
             v = self.maximum
         else:
             v = value
+        v = self._mangle_write(value)
+        v = self._convert_write(v)
         set_control(self.device, self.id, v)
 
     @property
