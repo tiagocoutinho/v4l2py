@@ -635,7 +635,7 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    def __init__(self, name_or_file, read_write=True, io=IO):
+    def __init__(self, name_or_file, read_write=True, io=IO, legacy_controls=True):
         super().__init__()
         self.info = None
         self.controls = None
@@ -656,6 +656,7 @@ class Device(ReentrantContextManager):
         self.log = log.getChild(filename.stem)
         self.filename = filename
         self.index = device_number(filename)
+        self.legacy_controls = legacy_controls
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
@@ -675,7 +676,10 @@ class Device(ReentrantContextManager):
 
     def _init(self):
         self.info = read_info(self.fileno())
-        self.controls = Controls.from_device(self)
+        if self.legacy_controls:
+            self.controls = LegacyControls.from_device(self)
+        else:
+            self.controls = Controls.from_device(self)
 
     def open(self):
         if not self._fobj:
@@ -834,6 +838,15 @@ class Controls(dict):
                 v.set_to_default()
             except AttributeError:
                 pass
+
+
+class LegacyControls(Controls):
+    @classmethod
+    def from_device(cls, device):
+        ctrl_dict = dict()
+        for ctrl in device.info.controls:
+            ctrl_dict[ctrl.id] = LegacyControl(device, ctrl)
+        return cls(ctrl_dict)
 
 
 class MenuItem:
