@@ -1121,7 +1121,7 @@ class VideoCapture(BufferManager):
 
     def __enter__(self):
         self.open()
-        return self.buffer
+        return self
 
     def __exit__(self, *exc):
         self.close()
