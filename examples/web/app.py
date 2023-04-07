@@ -104,6 +104,8 @@ class Camera:
         self.last_request: float = 0.0
         self.trigger: Trigger = Trigger()
         self.frame_type = frame_type
+        with device:
+            self.info = self.device.info
 
     def __iter__(self):
         while True:
@@ -133,7 +135,7 @@ class Camera:
     def run(self):
         with self.device:
             self.last_request = gevent.time.monotonic()
-            for i, frame in enumerate(self.device):
+            for frame in self.device:
                 self.last_frame = frame_to_image(frame)
                 self.trigger.set()
                 if gevent.time.monotonic() - self.last_request > 10:
@@ -146,9 +148,6 @@ def cameras() -> list[Camera]:
     if CAMERAS is None:
         cameras = {}
         for device in iter_video_capture_devices(io=GeventIO):
-            with device:
-                # pass just to make it read camera info
-                pass
             cameras[device.index] = Camera(device)
         CAMERAS = cameras
     return CAMERAS
@@ -165,7 +164,7 @@ def frame_to_image(frame, output="jpeg"):
         case PixelFormat.GREY:
             data = frame.array
             data.shape = frame.height, frame.width, -1
-            image = PIL.Image.frombuffer("L", (format.width, format.height), data)
+            image = PIL.Image.frombuffer("L", (frame.width, frame.height), data)
         case PixelFormat.YUYV:
             data = frame.array
             data.shape = frame.height, frame.width, -1
@@ -192,7 +191,7 @@ def start(device_id):
     camera = cameras()[device_id]
     camera.start()
     return (
-        f'<img src="/camera/{device_id}/stream" width="640" alt="{camera.device.info.card}"/>',
+        f'<img src="/camera/{device_id}/stream" width="640" alt="{camera.info.card}"/>',
         200,
     )
 
