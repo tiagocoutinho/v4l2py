@@ -584,7 +584,8 @@ def set_priority(fd, priority: Priority):
 
 def create_buffer(fd, buffer_type: BufferType, memory: Memory) -> raw.v4l2_buffer:
     """request + query buffers"""
-    return create_buffer(fd, buffer_type, memory, 1)
+    buffers = create_buffers(fd, buffer_type, memory, 1)
+    return buffers[0]
 
 
 def create_buffers(
