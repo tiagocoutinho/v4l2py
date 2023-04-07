@@ -916,7 +916,7 @@ class BaseControl:
                 reasons.append("disabled")
             if self.is_grabbed:
                 reasons.append("grabbed")
-            raise AttributeError(f"Control {self.config_name} is not writeable: {', '.join(reasons)}")
+            raise AttributeError(f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}")
         if value < self.minimum:
             v = self.minimum
         elif value > self.maximum:
