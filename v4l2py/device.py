@@ -1009,23 +1009,29 @@ class BaseControl:
 
 
 class BaseNumericControl(BaseControl):
-    def __init__(self, device, info):
+    def __init__(self, device, info, clipping=True):
         super().__init__(device, info)
         self.minimum = self._info.minimum
         self.maximum = self._info.maximum
         self.step = self._info.step
+        self.clipping = clipping
 
     def _get_repr(self) -> str:
         repr = f" min={self.minimum} max={self.maximum} step={self.step}"
         return repr
 
     def _mangle_write(self, value):
-        if value < self.minimum:
-            return self.minimum
-        elif value > self.maximum:
-            return self.maximum
+        if self.clipping:
+            if value < self.minimum:
+                return self.minimum
+            elif value > self.maximum:
+                return self.maximum
         else:
-            return value
+            if value < self.minimum:
+                raise ValueError(f"Control {self.config_name}: {value} exceeds allowed minimum {self.minimum}")
+            elif value > self.maximum:
+                raise ValueError(f"Control {self.config_name}: {value} exceeds allowed maximum {self.maximum}")
+        return value
 
     def increase(self, steps: int = 1):
         self.value += (steps * self.step)
