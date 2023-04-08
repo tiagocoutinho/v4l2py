@@ -1167,7 +1167,7 @@ class MemoryMap(ReentrantContextManager):
             yield self.read()
 
     async def __aiter__(self):
-        device = self.device
+        device = self.device.fileno()
         loop = asyncio.get_event_loop()
         event = asyncio.Event()
         frame = None
