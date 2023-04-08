@@ -16,6 +16,7 @@ import logging
 import mmap
 import os
 import pathlib
+import select
 import typing
 from io import IOBase
 from collections import UserDict
@@ -64,6 +65,10 @@ SelectionTarget = _enum("SelectionTarget", "V4L2_SEL_TGT_")
 Priority = _enum("Priority", "V4L2_PRIORITY_")
 TimeCode = _enum("TimeCode", "V4L2_TC_TYPE_")
 TimeFlag = _enum("TimeFlag", "V4L2_TC_FLAG_", klass=enum.IntFlag)
+EventType = _enum("EventType", "V4L2_EVENT_")
+EventSubscriptionFlag = _enum(
+    "EventSubscriptionFlag", "V4L2_EVENT_SUB_FL_", klass=enum.IntFlag
+)
 
 
 def human_pixel_format(ifmt):
@@ -578,6 +583,32 @@ def set_priority(fd, priority: Priority):
     ioctl(fd, IOC.S_PRIORITY, priority)
 
 
+def subscribe_event(
+    fd,
+    event_type: EventType = EventType.ALL,
+    id: int = 0,
+    flags: EventSubscriptionFlag = 0,
+):
+    sub = raw.v4l2_event_subscription()
+    sub.type = event_type
+    sub.id = id
+    sub.flags = flags
+    ioctl(fd, IOC.SUBSCRIBE_EVENT, sub)
+
+
+def unsubscribe_event(fd, event_type: EventType = EventType.ALL, id: int = 0):
+    sub = raw.v4l2_event_subscription()
+    sub.type = event_type
+    sub.id = id
+    ioctl(fd, IOC.UNSUBSCRIBE_EVENT, sub)
+
+
+def deque_event(fd):
+    event = raw.v4l2_event()
+    ioctl(fd, IOC.DQEVENT, event)
+    return event
+
+
 # Helpers
 
 
@@ -782,6 +813,20 @@ class Device(ReentrantContextManager):
 
     def write(self, data: bytes) -> None:
         self._fobj.write(data)
+
+    def subscribe_event(
+        self,
+        event_type: EventType = EventType.ALL,
+        id: int = 0,
+        flags: EventSubscriptionFlag = 0,
+    ):
+        return subscribe_event(self.fileno(), event_type, id, flags)
+
+    def unsubscribe_event(self, event_type: EventType = EventType.ALL, id: int = 0):
+        return unsubscribe_event(self.fileno(), event_type, id)
+
+    def deque_event(self):
+        return deque_event(self.fileno())
 
 
 class Controls(dict):
@@ -1464,35 +1509,21 @@ class MemoryMap(ReentrantContextManager):
         self.buffer_manager = buffer_manager
         self.buffers = None
         self.reader = QueueReader(buffer_manager, Memory.MMAP)
+        self.frame_reader = FrameReader(self.device, self.raw_read)
 
     @property
     def device(self) -> Device:
         return self.buffer_manager.device
 
     def __iter__(self):
-        while True:
-            yield self.read()
+        with self.frame_reader:
+            while True:
+                yield self.frame_reader.read()
 
     async def __aiter__(self):
-        device = self.device.fileno()
-        loop = asyncio.get_event_loop()
-        event = asyncio.Event()
-        frame = None
-
-        def cb():
-            nonlocal frame
-            frame = self.raw_read()
-            event.set()
-
-        loop.add_reader(device, cb)
-        try:
+        async with self.frame_reader:
             while True:
-                await event.wait()
-                event.clear()
-                yield frame
-                frame = None
-        finally:
-            loop.remove_reader(device)
+                yield await self.frame_reader.aread()
 
     def open(self):
         if self.buffers is None:
@@ -1537,6 +1568,154 @@ class MemoryMap(ReentrantContextManager):
         else:
             self.read = self.wait_read
         return self.read()
+
+
+class EventReader:
+    def __init__(self, device: Device, max_queue_size=100):
+        self.device = device
+        self._task = None
+        self._error = None
+        self._loop = None
+        self._selector = None
+        self._buffer = collections.deque([], maxlen=max_queue_size)
+
+    async def __aenter__(self):
+        if self.device.is_blocking:
+            raise V4L2Error("Cannot use async frame reader on blocking device")
+        self._selector = select.epoll()
+        self._loop = asyncio.get_event_loop()
+        self._loop.add_reader(self._selector.fileno(), self._on_event)
+        self._selector.register(self.device.fileno(), select.POLLPRI)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self._selector.unregister(self.device.fileno())
+        self._loop.remove_reader(self._selector.fileno())
+        self._selector.close()
+        self._selector = None
+        self._loop = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        pass
+
+    def _on_event(self):
+        task = self._task
+        buffer = self._buffer
+        awaited = task and not task.done()
+
+        try:
+            self._selector.poll(0)  # avoid blocking
+            event = self.device.deque_event()
+        except Exception as ex:
+            if awaited:
+                task.set_exception(ex)
+            return
+
+        if awaited and buffer:
+            # pop item first, so we do not add value to already full buffer
+            item = buffer.popleft()
+            buffer.append(event)
+            task.set_result(item)
+        elif awaited and not buffer:
+            # no data in buffer, so put value as result of awaited
+            # task immediately
+            task.set_result(event)
+        else:
+            if len(buffer) == buffer.maxlen:
+                self.device.log.debug("missed event")
+                buffer.popleft()
+            buffer.append(event)
+
+    def read(self, timeout=None):
+        if not self.device.is_blocking:
+            _, _, exc = self.device.io.select((), (), (self.device,), timeout)
+            if not exc:
+                return
+        return self.device.deque_event()
+
+    async def aread(self):
+        """Wait for next event or return last event in queue"""
+        self._task = self._loop.create_future()
+        if self._error:
+            self._task.set_exception(self._error)
+            self._error = None
+        elif self._last_event is not None:
+            self._task.set_result(self._last_event)
+            self._last_event = None
+        return await self._task
+
+
+class FrameReader:
+    def __init__(self, device: Device, raw_read):
+        self.device = device
+        self.raw_read = raw_read
+        self._task = None
+        self._error = None
+        self._loop = None
+        self._selector = None
+        self._last_event = None
+
+    async def __aenter__(self):
+        if self.device.is_blocking:
+            raise V4L2Error("Cannot use async frame reader on blocking device")
+        self._selector = select.epoll()
+        self._loop = asyncio.get_event_loop()
+        self._loop.add_reader(self._selector.fileno(), self._on_aread)
+        self._selector.register(self.device.fileno(), select.POLLIN)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self._selector.unregister(self.device.fileno())
+        self._loop.remove_reader(self._selector.fileno())
+        self._selector.close()
+        self._selector = None
+        self._loop = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        pass
+
+    def _on_aread(self):
+        task = self._task
+        awaited = task and not task.done()
+
+        try:
+            self._selector.poll(0)  # avoid blocking
+            data = self.raw_read()
+        except Exception as ex:
+            if awaited:
+                task.set_exception(ex)
+            return
+
+        if awaited:
+            task.set_result(data)
+        else:
+            if self._last_event:
+                self.device.log.debug("missed frame")
+            self._last_event = data
+
+    def read(self, timeout=None):
+        if not self.device.is_blocking:
+            read, _, _ = self.device.io.select((self.device,), (), (), timeout)
+            if not read:
+                return
+        return self.raw_read()
+
+    async def aread(self):
+        """Wait for next frame or return last frame"""
+        self._task = self._loop.create_future()
+        if self._error:
+            self._task.set_exception(self._error)
+            self._error = None
+        elif self._last_event is not None:
+            self._task.set_result(self._last_event)
+            self._last_event = None
+        return await self._task
 
 
 class QueueReader:
