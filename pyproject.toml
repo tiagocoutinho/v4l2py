@@ -84,4 +84,5 @@ target-version = "py37"
 combine-as-imports = true
 
 [tool.ruff.per-file-ignores]
+"examples/web/async.py" = ["B008"]
 "tests/test_device.py" = ["B008"]
