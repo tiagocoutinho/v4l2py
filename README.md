@@ -15,6 +15,21 @@ A two purpose API:
 
 Only works on python >= 3.7.
 
+## Why?
+
+So, why another library dedicated to video control? Couldn't I just use `cv2.VideoCapture`?
+
+Here is a list of features that this library provides which I couldn't find in other libraries:
+
+* List available V4L2 devices
+* Obtain detailed information about a device (name, driver, capabilities, available formats)
+* Fine control over the camera parameters (ex: resolution, format, brightness, contrast, etc)
+* Fine control resource management to take profit of memory map, DMA or user pointers (buffers)
+* Detailed information about a frame (timestamp, frame number, etc)
+* Write to VideoOutput
+* Integration with non blocking coroutine based applications (`gevent` and `asyncio`) 
+  without the usual tricks like using `asyncio.to_thread`
+
 
 ## Installation
 
@@ -212,7 +227,7 @@ with Device.from_id(0) as cam:
 See the ``linux/videodev2.h`` header file for details.
 
 
-* `Video for Linux Two Specification <http://linuxtv.org/downloads/v4l-dvb-apis/ch07s02.html>`
+* `Video for Linux Two Specification <https://www.kernel.org/doc/html/v6.2/userspace-api/media/v4l/v4l2.html>`
 
 [pypi-python-versions]: https://img.shields.io/pypi/pyversions/v4l2py.svg
 [pypi-version]: https://img.shields.io/pypi/v/v4l2py.svg
