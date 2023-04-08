@@ -5,16 +5,15 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 # Extra dependencies required to run this example:
-
 # pip install pillow cv2 flask gunicorn gevent
 
 # run from this directory with:
-# gunicorn --bind=0.0.0.0:8000 --log-level=debug --worker-class=gevent app:app
+# gunicorn --bind=0.0.0.0:8000 --log-level=debug --worker-class=gevent sync:app
 
-import io
+"""Flask example for v4l2py"""
+
 import logging
 
-import cv2
 import flask
 import gevent
 import gevent.event
@@ -22,16 +21,11 @@ import gevent.fileobject
 import gevent.monkey
 import gevent.queue
 import gevent.time
-import PIL.Image
 
-from v4l2py.device import (
-    ControlType,
-    Device,
-    PixelFormat,
-    VideoCapture,
-    iter_video_capture_devices,
-)
+from v4l2py.device import ControlType, Device, iter_video_capture_devices
 from v4l2py.io import GeventIO
+
+from common import BaseCamera, frame_to_image, BOUNDARY
 
 
 gevent.monkey.patch_all()
@@ -47,12 +41,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-BOUNDARY = "frame"
-HEADER = (
-    "--{boundary}\r\nContent-Type: image/{type}\r\nContent-Length: {length}\r\n\r\n"
-)
-SUFFIX = b"\r\n"
-
 CAMERAS = None
 
 
@@ -66,56 +54,21 @@ class StreamResponse(flask.Response):
         super().__init__(*args, **kwargs)
 
 
-class Trigger:
-    def __init__(self):
-        self.events = {}
-
-    def wait(self):
-        ident = gevent.getcurrent().minimal_ident
-        if ident not in self.events:
-            self.events[ident] = [gevent.event.Event(), gevent.time.monotonic()]
-        return self.events[ident][0].wait()
-
-    def set(self):
-        now = gevent.time.monotonic()
-        remove = []
-        for ident, event in self.events.items():
-            if event[0].is_set():
-                if now - event[1] > 5:
-                    log.info("Removing inactive client...")
-                    remove.append(ident)
-            else:
-                event[0].set()
-                event[1] = now
-        for ident in remove:
-            del self.events[ident]
-
-    def clear(self):
-        ident = gevent.getcurrent().minimal_ident
-        self.events[ident][0].clear()
-
-
-class Camera:
-    def __init__(self, device: Device, frame_type="jpeg") -> None:
-        self.device: Device = device
-        self.capture = VideoCapture(self.device)
+class Camera(BaseCamera):
+    def __init__(self, device: Device) -> None:
+        super().__init__(device)
+        self.clients: gevent.queue.Queue = gevent.queue.Queue()
         self.runner: gevent.Greenlet | None = None
-        self.last_frame: bytes | None = None
-        self.last_request: float = 0.0
-        self.trigger: Trigger = Trigger()
-        self.frame_type = frame_type
-        with device:
-            self.info = self.device.info
 
-    def __iter__(self):
-        while True:
-            yield self.next_frame()
-
-    def next_frame(self) -> bytes:
-        self.last_request = gevent.time.monotonic()
-        self.trigger.wait()
-        self.trigger.clear()
-        return self.last_frame
+    def get_clients(self, timeout=None) -> None | list[gevent.queue.Queue]:
+        try:
+            with gevent.Timeout(timeout):
+                clients = [self.clients.get()]
+        except gevent.Timeout:
+            return
+        while not self.clients.empty():
+            clients.append(self.clients.get_nowait())
+        return clients
 
     def start(self) -> None:
         if not self.is_running:
@@ -134,12 +87,13 @@ class Camera:
 
     def run(self):
         with self.device:
-            self.last_request = gevent.time.monotonic()
             for frame in self.device:
-                self.last_frame = frame_to_image(frame)
-                self.trigger.set()
-                if gevent.time.monotonic() - self.last_request > 10:
-                    log.info("Stopping camera task due to inactivity")
+                if clients := self.get_clients(timeout=3):
+                    data = frame_to_image(frame)
+                    for client in clients:
+                        client.put(data)
+                else:
+                    self.device.log.info("Stopping camera task due to inactivity")
                     break
 
 
@@ -151,34 +105,6 @@ def cameras() -> list[Camera]:
             cameras[device.index] = Camera(device)
         CAMERAS = cameras
     return CAMERAS
-
-
-def frame_to_image(frame, output="jpeg"):
-    match frame.pixel_format:
-        case PixelFormat.JPEG | PixelFormat.MJPEG:
-            if output == "jpeg":
-                return to_image_send(frame.data, type=output)
-            else:
-                buff = io.BytesIO()
-                image = PIL.Image.open(io.BytesIO(frame.data))
-        case PixelFormat.GREY:
-            data = frame.array
-            data.shape = frame.height, frame.width, -1
-            image = PIL.Image.frombuffer("L", (frame.width, frame.height), data)
-        case PixelFormat.YUYV:
-            data = frame.array
-            data.shape = frame.height, frame.width, -1
-            rgb = cv2.cvtColor(data, cv2.COLOR_YUV2RGB_YUYV)
-            image = PIL.Image.fromarray(rgb)
-
-    buff = io.BytesIO()
-    image.save(buff, output)
-    return to_image_send(buff.getvalue(), type=output)
-
-
-def to_image_send(data, type="jpeg", boundary=BOUNDARY):
-    header = HEADER.format(type=type, boundary=boundary, length=len(data)).encode()
-    return b"".join((header, data, SUFFIX))
 
 
 @app.get("/")
@@ -215,7 +141,14 @@ def device(device_id: int):
 @app.get("/camera/<int:device_id>/stream")
 def stream(device_id):
     camera = cameras()[device_id]
-    return StreamResponse(iter(camera))
+
+    def gen_frames():
+        client = gevent.queue.Queue()
+        while True:
+            camera.clients.put(client)
+            yield client.get()
+
+    return StreamResponse(gen_frames())
 
 
 @app.post("/camera/<int:device_id>/format")
@@ -232,15 +165,14 @@ def set_control(device_id, control_id):
     camera = cameras()[device_id]
     with camera.device:
         control = camera.device.controls[control_id]
-        control.value = int(flask.request.form["value"])
-    return "", 204
-
-
-@app.post("/camera/<int:device_id>/control/<int:control_id>/<int:value>")
-def set_control_value(device_id, control_id, value):
-    camera = cameras()[device_id]
-    with camera.device:
-        control = camera.device.controls[control_id]
+        value = flask.request.form.get("value", 0)
+        camera.device.log.info("setting %s to %s", control.name, value)
+        if value == "on":
+            value = 1
+        elif value == "off":
+            value = 0
+        else:
+            value = int(value)
         control.value = value
     return "", 204
 

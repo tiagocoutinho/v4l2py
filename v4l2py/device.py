@@ -913,8 +913,6 @@ class Control:
     def value(self, value):
         if not self.is_writeable:
             raise AttributeError(f"Control {self.config_name} is read-only")
-        if self.is_inactive:
-            raise AttributeError(f"Control {self.config_name} is currently inactive")
         if value < self.info.minimum:
             v = self.info.minimum
         elif value > self.info.maximum:
@@ -1148,6 +1146,7 @@ class VideoCapture(BufferManager):
             self.device.log.info("Closing video capture...")
             self.stream_off()
             self.buffer.close()
+            self.buffer = None
             self.device.log.info("Video capture closed")
 
 
@@ -1167,7 +1166,7 @@ class MemoryMap(ReentrantContextManager):
             yield self.read()
 
     async def __aiter__(self):
-        device = self.device
+        device = self.device.fileno()
         loop = asyncio.get_event_loop()
         event = asyncio.Event()
         frame = None
