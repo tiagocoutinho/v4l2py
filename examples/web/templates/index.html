@@ -13,22 +13,24 @@
         </style>
     </head>
     <body>
-        <nav class="navbar navbar-expand-lg bg-body-tertiary sticky-top ">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark bg-body-tertiary sticky-top">
             <div class="container-fluid">
                 <a class="navbar-brand" href="#">V4L2py</a>
             </div>  
         </nav>
-
-        <ul class="nav nav-tabs">
-            #for index, camera in cameras.items():
-                <li class="nav-item">
-                    <a class="nav-link active" hx-get="/camera/{{index}}" hx-target="#camera">
-                       {{camera.info.card}}
-                    </a>
-                </li>
-            #endfor
-        </ul>
-        <div class="container-fluid mt-3" id="camera">
+        <div class="container-fluid mt-3">
+            <ul class="nav nav-tabs">
+                #for index, camera in cameras.items():
+                    <li class="nav-item">
+                        <a class="nav-link active" hx-get="/camera/{{index}}" hx-target="#camera">
+                        {{camera.info.card}}
+                        </a>
+                    </li>
+                #endfor
+            </ul>
+            <div class="container-fluid mt-3" id="camera">
+            </div>
         </div>
+
     </body>
 </html>
