@@ -1146,6 +1146,7 @@ class VideoCapture(BufferManager):
             self.device.log.info("Closing video capture...")
             self.stream_off()
             self.buffer.close()
+            self.buffer = None
             self.device.log.info("Video capture closed")
 
 
