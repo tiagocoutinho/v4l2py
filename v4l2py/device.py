@@ -928,10 +928,10 @@ class BaseControl:
         else:
             return None
 
-    def _mangle_write(self, value):
+    def _convert_write(self, value):
         return value
 
-    def _convert_write(self, value):
+    def _mangle_write(self, value):
         return value
 
     @value.setter
@@ -947,8 +947,8 @@ class BaseControl:
             if self.is_grabbed:
                 reasons.append("grabbed")
             raise AttributeError(f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}")
-        v = self._mangle_write(value)
-        v = self._convert_write(v)
+        v = self._convert_write(value)
+        v = self._mangle_write(v)
         set_control(self.device, self.id, v)
 
     @property
