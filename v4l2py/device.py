@@ -784,7 +784,9 @@ class Device(ReentrantContextManager):
 class Controls(dict):
     @classmethod
     def from_device(cls, device):
-        ctrl_type_map = {}
+        ctrl_type_map = {
+            ControlType.BOOLEAN: BooleanControl,
+        }
         ctrl_dict = dict()
 
         for ctrl in device.info.controls:
@@ -1036,6 +1038,31 @@ class BaseNumericControl(BaseControl):
 
     def set_to_maximum(self):
         self.value = self.maximum
+
+
+class BooleanControl(BaseControl):
+    _true = ["true", "1", "yes", "on", "enable"]
+    _false = ["false", "0", "no", "off", "disable"]
+
+    def _convert_read(self, value):
+        return bool(value)
+
+    def _convert_write(self, value):
+        if isinstance(value, bool):
+            return value
+        elif isinstance(value, str):
+            if value in self._true:
+                return True
+            elif value in self._false:
+                return False
+        else:
+            try:
+                v = bool(value)
+            except Exception:
+                pass
+            else:
+                return v
+        raise ValueError(f"Failed to coerce {value.__class__.__name__} '{value}' to bool")
 
 
 class BaseCompoundControl(BaseControl):
