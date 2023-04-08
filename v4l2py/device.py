@@ -786,6 +786,8 @@ class Controls(dict):
     def from_device(cls, device):
         ctrl_type_map = {
             ControlType.BOOLEAN: BooleanControl,
+            ControlType.INTEGER: IntegerControl,
+            ControlType.INTEGER64: Integer64Control,
         }
         ctrl_dict = dict()
 
@@ -1009,6 +1011,9 @@ class BaseControl:
 
 
 class BaseNumericControl(BaseControl):
+    lower_bound = -2 ** 31
+    upper_bound = 2 ** 31
+
     def __init__(self, device, info, clipping=True):
         super().__init__(device, info)
         self.minimum = self._info.minimum
@@ -1016,9 +1021,29 @@ class BaseNumericControl(BaseControl):
         self.step = self._info.step
         self.clipping = clipping
 
+        if self.minimum < self.lower_bound:
+            raise RuntimeWarning(f"Control {self.config_name}'s claimed minimum value {self.minimum} exceeds lower bound of {self.__class__.__name__}")
+        if self.maximum > self.upper_bound:
+            raise RuntimeWarning(f"Control {self.config_name}'s claimed maximum value {self.maximum} exceeds upper bound of {self.__class__.__name__}")
+
     def _get_repr(self) -> str:
         repr = f" min={self.minimum} max={self.maximum} step={self.step}"
         return repr
+
+    def _convert_read(self, value):
+        return int(value)
+
+    def _convert_write(self, value):
+        if isinstance(value, int):
+            return value
+        else:
+            try:
+                v = int(value)
+            except Exception:
+                pass
+            else:
+                return v
+        raise ValueError(f"Failed to coerce {value.__class__.__name__} '{value}' to int")
 
     def _mangle_write(self, value):
         if self.clipping:
@@ -1044,6 +1069,16 @@ class BaseNumericControl(BaseControl):
 
     def set_to_maximum(self):
         self.value = self.maximum
+
+
+class IntegerControl(BaseNumericControl):
+    lower_bound = -2 ** 31
+    upper_bound = 2 ** 31
+
+
+class Integer64Control(BaseNumericControl):
+    lower_bound = -2 ** 63
+    upper_bound = 2 ** 63
 
 
 class BooleanControl(BaseControl):
