@@ -913,8 +913,6 @@ class Control:
     def value(self, value):
         if not self.is_writeable:
             raise AttributeError(f"Control {self.config_name} is read-only")
-        if self.is_inactive:
-            raise AttributeError(f"Control {self.config_name} is currently inactive")
         if value < self.info.minimum:
             v = self.info.minimum
         elif value > self.info.maximum:
