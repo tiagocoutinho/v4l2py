@@ -784,9 +784,14 @@ class Device(ReentrantContextManager):
 class Controls(dict):
     @classmethod
     def from_device(cls, device):
+        ctrl_type_map = {}
         ctrl_dict = dict()
+
         for ctrl in device.info.controls:
-            ctrl_dict[ctrl.id] = LegacyControl(device, ctrl)
+            ctrl_type = ControlType(ctrl.type)
+            ctrl_class = ctrl_type_map.get(ctrl_type, LegacyControl)
+            ctrl_dict[ctrl.id] = ctrl_class(device, ctrl)
+
         return cls(ctrl_dict)
 
     def __getattr__(self, key):
