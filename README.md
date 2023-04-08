@@ -119,7 +119,7 @@ frame 10136
 ...
 ```
 
-(check examples/basic_async.py)
+(check [basic async](examples/basic_async.py) and [web async](examples/web/async.py) examples)
 
 ### gevent
 
@@ -139,7 +139,7 @@ frame 10136
 ...
 ```
 
-(check examples/basic_gevent.py and examples/web/app.py)
+(check [basic gevent](examples/basic_gevent.py) and [web gevent](examples/web/sync.py) examples)
 
 ## Bonus track
 
