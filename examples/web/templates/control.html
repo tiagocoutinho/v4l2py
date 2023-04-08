@@ -24,8 +24,8 @@
             <input type="checkbox" class="form-check-input"
                  name="value"
                  id="checkbox-{{did}}-{{control.id}}"
-                 hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
-                 {{"selected" if value else "" }}
+                 hx-post="/camera/{{did}}/control/{{control.id}}"
+                 {{"checked" if value else "" }}
             >
             <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
                 {{control.name}}

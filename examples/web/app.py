@@ -66,56 +66,20 @@ class StreamResponse(flask.Response):
         super().__init__(*args, **kwargs)
 
 
-class Trigger:
-    def __init__(self):
-        self.events = {}
-
-    def wait(self):
-        ident = gevent.getcurrent().minimal_ident
-        if ident not in self.events:
-            self.events[ident] = [gevent.event.Event(), gevent.time.monotonic()]
-        return self.events[ident][0].wait()
-
-    def set(self):
-        now = gevent.time.monotonic()
-        remove = []
-        for ident, event in self.events.items():
-            if event[0].is_set():
-                if now - event[1] > 5:
-                    log.info("Removing inactive client...")
-                    remove.append(ident)
-            else:
-                event[0].set()
-                event[1] = now
-        for ident in remove:
-            del self.events[ident]
-
-    def clear(self):
-        ident = gevent.getcurrent().minimal_ident
-        self.events[ident][0].clear()
-
-
 class Camera:
-    def __init__(self, device: Device, frame_type="jpeg") -> None:
+    def __init__(self, device: Device) -> None:
         self.device: Device = device
-        self.capture = VideoCapture(self.device)
+        self.clients: gevent.queue.Queue = gevent.queue.Queue()
         self.runner: gevent.Greenlet | None = None
-        self.last_frame: bytes | None = None
-        self.last_request: float = 0.0
-        self.trigger: Trigger = Trigger()
-        self.frame_type = frame_type
         with device:
             self.info = self.device.info
+        self.capture = VideoCapture(self.device)
 
-    def __iter__(self):
-        while True:
-            yield self.next_frame()
-
-    def next_frame(self) -> bytes:
-        self.last_request = gevent.time.monotonic()
-        self.trigger.wait()
-        self.trigger.clear()
-        return self.last_frame
+    def get_clients(self):
+        clients = [self.clients.get()]
+        while not self.clients.empty():
+            clients.append(self.clients.get_nowait())
+        return clients
 
     def start(self) -> None:
         if not self.is_running:
@@ -133,14 +97,18 @@ class Camera:
         return not (self.runner is None or self.runner.ready())
 
     def run(self):
+        log = self.device.log
         with self.device:
-            self.last_request = gevent.time.monotonic()
             for frame in self.device:
-                self.last_frame = frame_to_image(frame)
-                self.trigger.set()
-                if gevent.time.monotonic() - self.last_request > 10:
+                clients = None
+                with gevent.Timeout(3, False):
+                    clients = self.get_clients()
+                if clients is None:
                     log.info("Stopping camera task due to inactivity")
                     break
+                data = frame_to_image(frame)
+                for client in clients:
+                    client.put(data)
 
 
 def cameras() -> list[Camera]:
@@ -215,7 +183,14 @@ def device(device_id: int):
 @app.get("/camera/<int:device_id>/stream")
 def stream(device_id):
     camera = cameras()[device_id]
-    return StreamResponse(iter(camera))
+
+    def gen_frames():
+        client = gevent.queue.Queue()
+        while True:
+            camera.clients.put(client)
+            yield client.get()
+
+    return StreamResponse(gen_frames())
 
 
 @app.post("/camera/<int:device_id>/format")
@@ -232,7 +207,15 @@ def set_control(device_id, control_id):
     camera = cameras()[device_id]
     with camera.device:
         control = camera.device.controls[control_id]
-        control.value = int(flask.request.form["value"])
+        value = flask.request.form.get("value", 0)
+        camera.device.log.info("setting %s to %s", control.name, value)
+        if value == "on":
+            value = 1
+        elif value == "off":
+            value = 0
+        else:
+            value = int(value)
+        control.value = value
     return "", 204
 
 
