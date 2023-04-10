@@ -320,7 +320,8 @@ checks for `MenuItem`, these should be changed to `LegacyMenuItem`.
 See the ``linux/videodev2.h`` header file for details.
 
 
-* `Video for Linux Two Specification <https://www.kernel.org/doc/html/v6.2/userspace-api/media/v4l/v4l2.html>`
+* [V4L2 (Latest)](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html) ([videodev.h](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/videodev.html))
+* [V4L2 6.2](https://www.kernel.org/doc/html/v6.2/userspace-api/media/v4l/v4l2.html) ([videodev.h](https://www.kernel.org/doc/html/v6.2/userspace-api/media/v4l/videodev.html))
 
 [pypi-python-versions]: https://img.shields.io/pypi/pyversions/v4l2py.svg
 [pypi-version]: https://img.shields.io/pypi/v/v4l2py.svg
