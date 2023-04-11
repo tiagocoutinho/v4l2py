@@ -1573,19 +1573,19 @@ class MemoryMap(ReentrantContextManager):
 class EventReader:
     def __init__(self, device: Device, max_queue_size=100):
         self.device = device
-        self._task = None
-        self._error = None
         self._loop = None
         self._selector = None
-        self._buffer = collections.deque([], maxlen=max_queue_size)
+        self._buffer = None
+        self._max_queue_size = max_queue_size
 
     async def __aenter__(self):
         if self.device.is_blocking:
-            raise V4L2Error("Cannot use async frame reader on blocking device")
+            raise V4L2Error("Cannot use async event reader on blocking device")
+        self._buffer = asyncio.Queue(maxsize=self._max_queue_size)
         self._selector = select.epoll()
         self._loop = asyncio.get_event_loop()
         self._loop.add_reader(self._selector.fileno(), self._on_event)
-        self._selector.register(self.device.fileno(), select.POLLPRI)
+        self._selector.register(self.device.fileno(), select.EPOLLPRI)
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
@@ -1594,6 +1594,7 @@ class EventReader:
         self._selector.close()
         self._selector = None
         self._loop = None
+        self._buffer = None
 
     async def __aiter__(self):
         while True:
@@ -1606,32 +1607,19 @@ class EventReader:
         pass
 
     def _on_event(self):
-        task = self._task
-        buffer = self._buffer
-        awaited = task and not task.done()
-
+        task = self._loop.create_future()
         try:
             self._selector.poll(0)  # avoid blocking
             event = self.device.deque_event()
-        except Exception as ex:
-            if awaited:
-                task.set_exception(ex)
-            return
-
-        if awaited and buffer:
-            # pop item first, so we do not add value to already full buffer
-            item = buffer.popleft()
-            buffer.append(event)
-            task.set_result(item)
-        elif awaited and not buffer:
-            # no data in buffer, so put value as result of awaited
-            # task immediately
             task.set_result(event)
-        else:
-            if len(buffer) == buffer.maxlen:
-                self.device.log.debug("missed event")
-                buffer.popleft()
-            buffer.append(event)
+        except Exception as error:
+            task.set_exception(error)
+
+        buffer = self._buffer
+        if buffer.full():
+            self.device.log.debug("missed event")
+            buffer.popleft()
+        buffer.put_nowait(task)
 
     def read(self, timeout=None):
         if not self.device.is_blocking:
@@ -1642,29 +1630,23 @@ class EventReader:
 
     async def aread(self):
         """Wait for next event or return last event in queue"""
-        self._task = self._loop.create_future()
-        if self._error:
-            self._task.set_exception(self._error)
-            self._error = None
-        elif self._last_event is not None:
-            self._task.set_result(self._last_event)
-            self._last_event = None
-        return await self._task
+        task = await self._buffer.get()
+        return await task
 
 
 class FrameReader:
-    def __init__(self, device: Device, raw_read):
+    def __init__(self, device: Device, raw_read, max_queue_size=1):
         self.device = device
         self.raw_read = raw_read
-        self._task = None
-        self._error = None
         self._loop = None
         self._selector = None
-        self._last_event = None
+        self._buffer = None
+        self._max_queue_size = max_queue_size
 
     async def __aenter__(self):
         if self.device.is_blocking:
             raise V4L2Error("Cannot use async frame reader on blocking device")
+        self._buffer = asyncio.Queue(maxsize=self._max_queue_size)
         self._selector = select.epoll()
         self._loop = asyncio.get_event_loop()
         self._loop.add_reader(self._selector.fileno(), self._on_event)
@@ -1677,6 +1659,7 @@ class FrameReader:
         self._selector.close()
         self._selector = None
         self._loop = None
+        self._buffer = None
 
     def __enter__(self):
         return self
@@ -1685,23 +1668,19 @@ class FrameReader:
         pass
 
     def _on_event(self):
-        task = self._task
-        awaited = task and not task.done()
-
+        task = self._loop.create_future()
         try:
             self._selector.poll(0)  # avoid blocking
             data = self.raw_read()
-        except Exception as ex:
-            if awaited:
-                task.set_exception(ex)
-            return
-
-        if awaited:
             task.set_result(data)
-        else:
-            if self._last_event:
-                self.device.log.debug("missed frame")
-            self._last_event = data
+        except Exception as error:
+            task.set_exception(error)
+
+        buffer = self._buffer
+        if buffer.full():
+            self.device.log.warn("missed frame")
+            buffer.get_nowait()
+        buffer.put_nowait(task)
 
     def read(self, timeout=None):
         if not self.device.is_blocking:
@@ -1712,14 +1691,8 @@ class FrameReader:
 
     async def aread(self):
         """Wait for next frame or return last frame"""
-        self._task = self._loop.create_future()
-        if self._error:
-            self._task.set_exception(self._error)
-            self._error = None
-        elif self._last_event is not None:
-            self._task.set_result(self._last_event)
-            self._last_event = None
-        return await self._task
+        task = await self._buffer.get()
+        return await task
 
 
 class QueueReader:
