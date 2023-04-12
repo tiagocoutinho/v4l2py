@@ -115,12 +115,12 @@ buffers = {buffers}
 
 
 def ioctl(fd, request, arg):
-    log_ioctl.debug("%d, request=%s, arg=%s", fd, request.name, arg)
+    log_ioctl.debug("%s, request=%s, arg=%s", fd, request.name, arg)
     return fcntl.ioctl(fd, request.value, arg)
 
 
 def mem_map(fd, length, offset):
-    log_mmap.debug("%d, length=%d, offset=%d", fd, length, offset)
+    log_mmap.debug("%s, length=%d, offset=%d", fd, length, offset)
     return mmap.mmap(fd, length, offset=offset)
 
 
