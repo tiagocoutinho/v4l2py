@@ -206,6 +206,94 @@ with Device.from_id(0) as cam:
         buff = io.BytesIO(frame)
 ```
 
+## Improved device controls
+
+Device controls have been improved to provide a more pythonic interface. For
+now the legacy interface is still the default, the new interface has to be
+explicitly requested: `Device.from_id(x, legacy_controls=False)`.
+
+Before:
+```python
+>>> from v4l2py import Device
+>>> cam = Device.from_id(0)
+>>> cam.open()
+>>> for ctrl in cam.controls.values():
+...     print(ctrl)
+...     for item in ctrl.menu.values():
+...             print(f" - {item.index}: {item.name}")
+<LegacyControl brightness type=integer min=0 max=255 step=1 default=128 value=255>
+<LegacyControl contrast type=integer min=0 max=255 step=1 default=32 value=255>
+<LegacyControl saturation type=integer min=0 max=100 step=1 default=64 value=100>
+<LegacyControl hue type=integer min=-180 max=180 step=1 default=0 value=0>
+<LegacyControl white_balance_automatic type=boolean min=0 max=1 step=1 default=1 value=1>
+<LegacyControl gamma type=integer min=90 max=150 step=1 default=120 value=150>
+<LegacyControl gain type=integer min=1 max=7 step=1 default=1 value=1>
+<LegacyControl power_line_frequency type=menu min=0 max=2 step=1 default=2 value=2>
+ - 0: Disabled
+ - 1: 50 Hz
+ - 2: 60 Hz
+<LegacyControl white_balance_temperature type=integer min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<LegacyControl sharpness type=integer min=0 max=7 step=1 default=2 value=7>
+<LegacyControl backlight_compensation type=integer min=0 max=1 step=1 default=0 value=1>
+<LegacyControl auto_exposure type=menu min=0 max=3 step=1 default=3 value=3>
+ - 1: Manual Mode
+ - 3: Aperture Priority Mode
+<LegacyControl exposure_time_absolute type=integer min=10 max=333 step=1 default=156 value=156 flags=inactive>
+<LegacyControl exposure_dynamic_framerate type=boolean min=0 max=1 step=1 default=0 value=1>
+
+>>> type(cam.controls.exposure_dynamic_framerate.value)
+<class 'int'>
+```
+
+Now:
+```python
+>>> from v4l2py.device import Device, MenuControl
+>>> cam = Device.from_id(0, legacy_controls=False)
+>>> cam.open()
+>>> for ctrl in cam.controls.values():
+...     print(ctrl)
+...     if isinstance(ctrl, MenuControl):
+...             for (index, name) in ctrl.items():
+...                     print(f" - {index}: {name}")
+<IntegerControl brightness min=0 max=255 step=1 default=128 value=255>
+<IntegerControl contrast min=0 max=255 step=1 default=32 value=255>
+<IntegerControl saturation min=0 max=100 step=1 default=64 value=100>
+<IntegerControl hue min=-180 max=180 step=1 default=0 value=0>
+<BooleanControl white_balance_automatic default=True value=True>
+<IntegerControl gamma min=90 max=150 step=1 default=120 value=150>
+<IntegerControl gain min=1 max=7 step=1 default=1 value=1>
+<MenuControl power_line_frequency default=2 value=2>
+ - 0: Disabled
+ - 1: 50 Hz
+ - 2: 60 Hz
+<IntegerControl white_balance_temperature min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<IntegerControl sharpness min=0 max=7 step=1 default=2 value=7>
+<IntegerControl backlight_compensation min=0 max=1 step=1 default=0 value=1>
+<MenuControl auto_exposure default=3 value=3>
+ - 1: Manual Mode
+ - 3: Aperture Priority Mode
+<IntegerControl exposure_time_absolute min=10 max=333 step=1 default=156 value=156 flags=inactive>
+<BooleanControl exposure_dynamic_framerate default=False value=True>
+
+>>> type(cam.controls.white_balance_automatic.value)
+<class 'bool'>
+>>> cam.controls.white_balance_automatic.value
+<BooleanControl white_balance_automatic default=True value=True>
+>>> cam.controls.white_balance_automatic.value = False
+<BooleanControl white_balance_automatic default=True value=False>
+
+>>> wba = cam.controls.white_balance_automatic
+>>> wba.value = "enable"    # or "on", "1", "true", "yes"
+>>> wba
+<BooleanControl white_balance_automatic default=True value=True>
+>>> wba.value = "off"       # or "disable", "0", "false", "no"
+>>> wba
+<BooleanControl white_balance_automatic default=True value=False>
+```
+
+The initial upgrade path for existing code is to use `LegacyControl` instead of `Control` for instantiations, and 
+`BaseControl` for isinstance() checks. And in the unlikely case your code does isinstance() checks for `MenuItem`, these should be changed to `LegacyMenuItem`.
+
 ## References
 
 See the ``linux/videodev2.h`` header file for details.
