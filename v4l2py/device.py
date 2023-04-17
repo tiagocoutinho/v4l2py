@@ -19,6 +19,7 @@ import pathlib
 import typing
 
 from io import IOBase
+from collections import UserDict
 
 from . import raw
 from .io import IO, fopen
@@ -788,6 +789,8 @@ class Controls(dict):
             ControlType.BOOLEAN: BooleanControl,
             ControlType.INTEGER: IntegerControl,
             ControlType.INTEGER64: Integer64Control,
+            ControlType.MENU: MenuControl,
+            ControlType.INTEGER_MENU: MenuControl,
         }
         ctrl_dict = dict()
 
@@ -856,16 +859,6 @@ class LegacyControls(Controls):
         for ctrl in device.info.controls:
             ctrl_dict[ctrl.id] = LegacyControl(device, ctrl)
         return cls(ctrl_dict)
-
-
-class MenuItem:
-    def __init__(self, item):
-        self.item = item
-        self.index = item.index
-        self.name = item.name.decode()
-
-    def __repr__(self):
-        return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
 class BaseControl:
@@ -1106,9 +1099,38 @@ class BooleanControl(BaseControl):
         raise ValueError(f"Failed to coerce {value.__class__.__name__} '{value}' to bool")
 
 
+class MenuControl(BaseControl, UserDict):
+    def __init__(self, device, info):
+        BaseControl.__init__(self, device, info)
+        UserDict.__init__(self)
+
+        if self.type == ControlType.MENU:
+            self.data = {
+                item.index: item.name.decode()
+                for item in iter_read_menu(self.device._fobj, self)
+            }
+        elif self.type == ControlType.INTEGER_MENU:
+            self.data = {
+                item.index: int(item.name)
+                for item in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            raise TypeError(f"MenuControl only supports control types MENU or INTEGER_MENU, but not {self.type.name}")
+
+
 class BaseCompoundControl(BaseControl):
     def __init__(self, device, info):
         raise NotImplementedError()
+
+
+class LegacyMenuItem:
+    def __init__(self, item: raw.v4l2_querymenu):
+        self.item = item
+        self.index = item.index
+        self.name = item.name.decode()
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} index={self.index} name={self.name}>"
 
 
 class LegacyControl(BaseNumericControl):
@@ -1118,7 +1140,7 @@ class LegacyControl(BaseNumericControl):
         self.info = self._info
         if self.type == ControlType.MENU:
             self.menu = {
-                menu.index: MenuItem(menu)
+                menu.index: LegacyMenuItem(menu)
                 for menu in iter_read_menu(self.device._fobj, self)
             }
         else:
