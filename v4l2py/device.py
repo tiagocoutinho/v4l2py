@@ -307,9 +307,9 @@ def iter_read_menu(fd, ctrl):
         fd,
         IOC.QUERYMENU,
         menu,
-        start=ctrl.info.minimum,
-        stop=ctrl.info.maximum + 1,
-        step=ctrl.info.step,
+        start=ctrl._info.minimum,
+        stop=ctrl._info.maximum + 1,
+        step=ctrl._info.step,
         ignore_einval=True,
     ):
         yield copy.deepcopy(menu)
