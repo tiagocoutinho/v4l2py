@@ -19,6 +19,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
     - uses: chartboost/ruff-action@v1
+      with:
+        args: -v v4l2py tests examples
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
