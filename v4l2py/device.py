@@ -17,12 +17,10 @@ import mmap
 import os
 import pathlib
 import typing
-
 from io import IOBase
 
 from . import raw
 from .io import IO, fopen
-
 
 log = logging.getLogger(__name__)
 log_ioctl = log.getChild("ioctl")

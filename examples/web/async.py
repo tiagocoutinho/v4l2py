@@ -16,15 +16,13 @@ import asyncio
 import logging
 from typing import Annotated
 
+from common import BOUNDARY, BaseCamera, frame_to_image
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from v4l2py.device import ControlType, Device, iter_video_capture_devices
-
-from common import BaseCamera, frame_to_image, BOUNDARY
-
 
 logging.basicConfig(
     level="INFO",

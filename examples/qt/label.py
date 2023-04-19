@@ -1,5 +1,6 @@
 import cv2
-from qtpy import QtWidgets, QtGui, QtCore
+from qtpy import QtCore, QtGui, QtWidgets
+
 from v4l2py import Device, VideoCapture
 
 

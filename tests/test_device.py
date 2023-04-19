@@ -7,12 +7,12 @@
 from contextlib import ExitStack
 from errno import EINVAL
 from inspect import isgenerator
+from math import isclose
 from pathlib import Path
 from random import randint
 from unittest import mock
-from math import isclose
 
-from ward import each, fixture, test, raises
+from ward import each, fixture, raises, test
 
 try:
     import numpy
@@ -21,10 +21,10 @@ except ImportError:
 
 from v4l2py import raw
 from v4l2py.device import (
-    Device,
-    VideoCapture,
-    PixelFormat,
     BufferType,
+    Device,
+    PixelFormat,
+    VideoCapture,
     device_number,
     iter_devices,
     iter_video_files,
