@@ -8,8 +8,9 @@
 # run with: QT_API=pyqt6 python widget.py
 
 import cv2
-from qtpy import QtWidgets, QtGui, QtCore
-from v4l2py import Device, VideoCapture, PixelFormat
+from qtpy import QtCore, QtGui, QtWidgets
+
+from v4l2py import Device, PixelFormat, VideoCapture
 
 
 class QVideo(QtWidgets.QWidget):

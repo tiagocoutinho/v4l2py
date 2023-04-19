@@ -19,7 +19,6 @@ import PIL.Image
 
 from v4l2py.device import Device, PixelFormat, VideoCapture
 
-
 BOUNDARY = "frame"
 HEADER = (
     "--{boundary}\r\nContent-Type: image/{type}\r\nContent-Length: {length}\r\n\r\n"

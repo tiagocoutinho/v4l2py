@@ -9,13 +9,13 @@
 from .device import (
     Device,
     Frame,
-    VideoCapture,
     MemoryMap,
     PixelFormat,
-    iter_video_files,
-    iter_video_capture_files,
+    VideoCapture,
     iter_devices,
     iter_video_capture_devices,
+    iter_video_capture_files,
+    iter_video_files,
 )
 from .io import IO, GeventIO
 

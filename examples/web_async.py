@@ -18,7 +18,6 @@ import fastapi.responses
 
 from v4l2py import Device, VideoCapture
 
-
 PREFIX = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
 SUFFIX = b"\r\n"
 INDEX = """\

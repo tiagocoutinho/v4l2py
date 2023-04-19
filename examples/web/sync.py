@@ -21,12 +21,10 @@ import gevent.fileobject
 import gevent.monkey
 import gevent.queue
 import gevent.time
+from common import BOUNDARY, BaseCamera, frame_to_image
 
 from v4l2py.device import ControlType, Device, iter_video_capture_devices
 from v4l2py.io import GeventIO
-
-from common import BaseCamera, frame_to_image, BOUNDARY
-
 
 gevent.monkey.patch_all()
 
