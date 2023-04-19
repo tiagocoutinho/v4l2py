@@ -137,7 +137,7 @@ class Hardware:
         assert self.fd == fd
         return MemoryMap(self)
 
-    def select(self, readers, writers, other):
+    def select(self, readers, writers, other, timeout=None):
         assert readers[0].fileno() == self.fd
         return readers, writers, other
 
