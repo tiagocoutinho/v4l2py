@@ -1122,6 +1122,9 @@ class MenuControl(BaseControl, UserDict):
         else:
             raise TypeError(f"MenuControl only supports control types MENU or INTEGER_MENU, but not {self.type.name}")
 
+    def _convert_write(self, value):
+        return int(value)
+
 
 class BaseCompoundControl(BaseControl):
     def __init__(self, device, info):
