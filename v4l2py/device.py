@@ -851,6 +851,11 @@ class Controls(dict):
             except AttributeError:
                 pass
 
+    def set_clipping(self, clipping: bool) -> None:
+        for v in self.values():
+            if isinstance(v, BaseNumericControl):
+                v.clipping = clipping
+
 
 class LegacyControls(Controls):
     @classmethod
