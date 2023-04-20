@@ -4,17 +4,17 @@ from v4l2py.device import Device, MenuControl, LegacyControl
 
 
 def _get_ctrl(cam, control):
-        if control.isdigit() or control.startswith("0x"):
-            _ctrl = int(control, 0)
-        else:
-            _ctrl = control
+    if control.isdigit() or control.startswith("0x"):
+        _ctrl = int(control, 0)
+    else:
+        _ctrl = control
 
-        try:
-            ctrl = cam.controls[_ctrl]
-        except KeyError:
-            return None
-        else:
-            return ctrl
+    try:
+        ctrl = cam.controls[_ctrl]
+    except KeyError:
+        return None
+    else:
+        return ctrl
 
 
 def show_control_status(device: str, legacy_controls: bool) -> None:
