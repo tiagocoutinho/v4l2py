@@ -636,7 +636,7 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    def __init__(self, name_or_file, read_write=True, io=IO, legacy_controls=True):
+    def __init__(self, name_or_file, read_write=True, io=IO, legacy_controls=False):
         super().__init__()
         self.info = None
         self.controls = None
