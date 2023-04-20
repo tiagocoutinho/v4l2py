@@ -933,13 +933,13 @@ class BaseControl:
     def value(self, value):
         if not self.is_writeable:
             reasons = []
-            if self.is_readonly:
+            if self.is_flagged_read_only:
                 reasons.append("read-only")
-            if self.is_inactive:
+            if self.is_flagged_inactive:
                 reasons.append("inactive")
-            if self.is_disabled:
+            if self.is_flagged_disabled:
                 reasons.append("disabled")
-            if self.is_grabbed:
+            if self.is_flagged_grabbed:
                 reasons.append("grabbed")
             raise AttributeError(f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}")
         v = self._convert_write(value)
