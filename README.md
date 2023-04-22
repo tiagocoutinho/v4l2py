@@ -101,7 +101,7 @@ Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 <IntegerControl brightness min=0 max=255 step=1 default=128 value=64>
 ```
 
-(see also examples/v4l2py-ctl.py)
+(see also [v4l2py-ctl](examples/v4l2py-ctl.py) example)
 
 ### asyncio
 
