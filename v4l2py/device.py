@@ -899,7 +899,11 @@ class BaseControl:
         if not self.is_flagged_write_only:
             repr += f" value={self.value}"
 
-        flags = [flag.name.lower() for flag in ControlFlag if ((self._info.flags & flag) == flag)]
+        flags = [
+            flag.name.lower()
+            for flag in ControlFlag
+            if ((self._info.flags & flag) == flag)
+        ]
         if flags:
             repr += " flags=" + ",".join(flags)
 
@@ -952,7 +956,9 @@ class BaseControl:
                 reasons.append("disabled")
             if self.is_flagged_grabbed:
                 reasons.append("grabbed")
-            raise AttributeError(f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}")
+            raise AttributeError(
+                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
+            )
         v = self._convert_write(value)
         v = self._mangle_write(v)
         set_control(self.device, self.id, v)
@@ -995,28 +1001,38 @@ class BaseControl:
 
     @property
     def is_flagged_execute_on_write(self) -> bool:
-        return (self._info.flags & ControlFlag.EXECUTE_ON_WRITE) == ControlFlag.EXECUTE_ON_WRITE
+        return (
+            self._info.flags & ControlFlag.EXECUTE_ON_WRITE
+        ) == ControlFlag.EXECUTE_ON_WRITE
 
     @property
     def is_flagged_modify_layout(self) -> bool:
-        return (self._info.flags & ControlFlag.MODIFY_LAYOUT) == ControlFlag.MODIFY_LAYOUT
+        return (
+            self._info.flags & ControlFlag.MODIFY_LAYOUT
+        ) == ControlFlag.MODIFY_LAYOUT
 
     @property
     def is_flagged_dynamic_array(self) -> bool:
-        return (self._info.flags & ControlFlag.DYNAMIC_ARRAY) == ControlFlag.DYNAMIC_ARRAY
+        return (
+            self._info.flags & ControlFlag.DYNAMIC_ARRAY
+        ) == ControlFlag.DYNAMIC_ARRAY
 
     @property
     def is_writeable(self) -> bool:
-        return not (self.is_flagged_read_only or self.is_flagged_inactive
-                    or self.is_flagged_disabled or self.is_flagged_grabbed)
+        return not (
+            self.is_flagged_read_only
+            or self.is_flagged_inactive
+            or self.is_flagged_disabled
+            or self.is_flagged_grabbed
+        )
 
     def set_to_default(self):
         self.value = self.default
 
 
 class BaseNumericControl(BaseControl):
-    lower_bound = -2 ** 31
-    upper_bound = 2 ** 31
+    lower_bound = -(2**31)
+    upper_bound = 2**31
 
     def __init__(self, device, info, clipping=True):
         super().__init__(device, info)
@@ -1026,9 +1042,13 @@ class BaseNumericControl(BaseControl):
         self.clipping = clipping
 
         if self.minimum < self.lower_bound:
-            raise RuntimeWarning(f"Control {self.config_name}'s claimed minimum value {self.minimum} exceeds lower bound of {self.__class__.__name__}")
+            raise RuntimeWarning(
+                f"Control {self.config_name}'s claimed minimum value {self.minimum} exceeds lower bound of {self.__class__.__name__}"
+            )
         if self.maximum > self.upper_bound:
-            raise RuntimeWarning(f"Control {self.config_name}'s claimed maximum value {self.maximum} exceeds upper bound of {self.__class__.__name__}")
+            raise RuntimeWarning(
+                f"Control {self.config_name}'s claimed maximum value {self.maximum} exceeds upper bound of {self.__class__.__name__}"
+            )
 
     def _get_repr(self) -> str:
         repr = f" min={self.minimum} max={self.maximum} step={self.step}"
@@ -1047,7 +1067,9 @@ class BaseNumericControl(BaseControl):
                 pass
             else:
                 return v
-        raise ValueError(f"Failed to coerce {value.__class__.__name__} '{value}' to int")
+        raise ValueError(
+            f"Failed to coerce {value.__class__.__name__} '{value}' to int"
+        )
 
     def _mangle_write(self, value):
         if self.clipping:
@@ -1057,16 +1079,20 @@ class BaseNumericControl(BaseControl):
                 return self.maximum
         else:
             if value < self.minimum:
-                raise ValueError(f"Control {self.config_name}: {value} exceeds allowed minimum {self.minimum}")
+                raise ValueError(
+                    f"Control {self.config_name}: {value} exceeds allowed minimum {self.minimum}"
+                )
             elif value > self.maximum:
-                raise ValueError(f"Control {self.config_name}: {value} exceeds allowed maximum {self.maximum}")
+                raise ValueError(
+                    f"Control {self.config_name}: {value} exceeds allowed maximum {self.maximum}"
+                )
         return value
 
     def increase(self, steps: int = 1):
-        self.value += (steps * self.step)
+        self.value += steps * self.step
 
     def decrease(self, steps: int = 1):
-        self.value -= (steps * self.step)
+        self.value -= steps * self.step
 
     def set_to_minimum(self):
         self.value = self.minimum
@@ -1076,13 +1102,13 @@ class BaseNumericControl(BaseControl):
 
 
 class IntegerControl(BaseNumericControl):
-    lower_bound = -2 ** 31
-    upper_bound = 2 ** 31
+    lower_bound = -(2**31)
+    upper_bound = 2**31
 
 
 class Integer64Control(BaseNumericControl):
-    lower_bound = -2 ** 63
-    upper_bound = 2 ** 63
+    lower_bound = -(2**63)
+    upper_bound = 2**63
 
 
 class BooleanControl(BaseControl):
@@ -1107,7 +1133,9 @@ class BooleanControl(BaseControl):
                 pass
             else:
                 return v
-        raise ValueError(f"Failed to coerce {value.__class__.__name__} '{value}' to bool")
+        raise ValueError(
+            f"Failed to coerce {value.__class__.__name__} '{value}' to bool"
+        )
 
 
 class MenuControl(BaseControl, UserDict):
@@ -1126,7 +1154,9 @@ class MenuControl(BaseControl, UserDict):
                 for item in iter_read_menu(self.device._fobj, self)
             }
         else:
-            raise TypeError(f"MenuControl only supports control types MENU or INTEGER_MENU, but not {self.type.name}")
+            raise TypeError(
+                f"MenuControl only supports control types MENU or INTEGER_MENU, but not {self.type.name}"
+            )
 
     def _convert_write(self, value):
         return int(value)
@@ -1186,10 +1216,10 @@ class LegacyControl(BaseNumericControl):
         return self.is_flagged_disabled
 
     def increase(self, steps: int = 1):
-        self.value += (steps * self.step)
+        self.value += steps * self.step
 
     def decrease(self, steps: int = 1):
-        self.value -= (steps * self.step)
+        self.value -= steps * self.step
 
 
 class DeviceHelper:

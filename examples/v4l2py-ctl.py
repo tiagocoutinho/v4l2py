@@ -28,7 +28,7 @@ def show_control_status(device: str, legacy_controls: bool) -> None:
             for ctrl in cam.controls.with_class(cc):
                 print("0x%08x:" % ctrl.id, ctrl)
                 if isinstance(ctrl, MenuControl):
-                    for (key, value) in ctrl.items():
+                    for key, value in ctrl.items():
                         print(11 * " ", f" +-- {key}: {value}")
                 elif isinstance(ctrl, LegacyControl):
                     for item in ctrl.menu.values():
@@ -53,15 +53,19 @@ def get_controls(device: str, controls: list, legacy_controls: bool) -> None:
         print("")
 
 
-def set_controls(device: str, controls: list, legacy_controls: bool, clipping: bool) -> None:
-    controls = ((ctrl.strip(), value.strip()) for (ctrl, value) in
-                (c.split("=") for c in controls))
+def set_controls(
+    device: str, controls: list, legacy_controls: bool, clipping: bool
+) -> None:
+    controls = (
+        (ctrl.strip(), value.strip())
+        for (ctrl, value) in (c.split("=") for c in controls)
+    )
 
     with Device(device, legacy_controls=legacy_controls) as cam:
         print("Changing value of given controls ...\n")
 
         cam.controls.set_clipping(clipping)
-        for (control, value_new) in controls:
+        for control, value_new in controls:
             ctrl = _get_ctrl(cam, control)
             if not ctrl:
                 print(f"{control}: unknown control")
@@ -85,7 +89,9 @@ def set_controls(device: str, controls: list, legacy_controls: bool, clipping: b
             if success:
                 print(f"{result} {control}: {value_old} -> {value_new}\n")
             else:
-                print(f"{result} {control}: {value_old} -> {value_new}\n{result} {reason}\n")
+                print(
+                    f"{result} {control}: {value_old} -> {value_new}\n{result} {reason}\n"
+                )
 
 
 def reset_controls(device: str, controls: list, legacy_controls: bool) -> None:
@@ -136,29 +142,33 @@ if __name__ == "__main__":
         "--clipping",
         default=False,
         action="store_true",
-        help="when changing numeric controls, enforce the written value to be within allowed range (default: %(default)s)"
+        help="when changing numeric controls, enforce the written value to be within allowed range (default: %(default)s)",
     )
     parser.add_argument(
         "--device",
-        type=str, default="0",
+        type=str,
+        default="0",
         metavar="<dev>",
         help="use device <dev> instead of /dev/video0; if <dev> starts with a digit, then /dev/video<dev> is used",
     )
     parser.add_argument(
         "--get-ctrl",
-        type=csv, default=[],
+        type=csv,
+        default=[],
         metavar="<ctrl>[,<ctrl>...]",
         help="get the values of the specified controls",
     )
     parser.add_argument(
         "--set-ctrl",
-        type=csv, default=[],
+        type=csv,
+        default=[],
         metavar="<ctrl>=<val>[,<ctrl>=<val>...]",
         help="set the values of the specified controls",
     )
     parser.add_argument(
         "--reset-ctrl",
-        type=csv, default=[],
+        type=csv,
+        default=[],
         metavar="<ctrl>[,<ctrl>...]",
         help="reset the specified controls to their default values",
     )
