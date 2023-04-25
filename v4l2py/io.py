@@ -4,13 +4,13 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-import os
 import functools
+import os
 import select
 
 
 def fopen(path, rw=False, blocking=False):
-    kwargs = dict(buffering=0)
+    kwargs = {"buffering": 0}
     if not blocking:
 
         def opener(path, flags):

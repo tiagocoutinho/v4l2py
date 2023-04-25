@@ -1,15 +1,29 @@
+#
+# This file is part of the v4l2py project
+#
+# Copyright (c) 2021 Tiago Coutinho
+# Distributed under the GPLv3 license. See LICENSE for more info.
+
 from contextlib import ExitStack
 from errno import EINVAL
 from inspect import isgenerator
+from math import isclose
 from pathlib import Path
 from random import randint
 from unittest import mock
 
-import pytest
+from ward import each, fixture, raises, test
+
+try:
+    import numpy
+except ImportError:
+    numpy = None
 
 from v4l2py import raw
 from v4l2py.device import (
+    BufferType,
     Device,
+    PixelFormat,
     VideoCapture,
     device_number,
     iter_devices,
@@ -17,8 +31,22 @@ from v4l2py.device import (
 )
 
 
+class MemoryMap:
+    def __init__(self, hardware):
+        self.hardware = hardware
+
+    def __getitem__(self, item):
+        assert item.start is None
+        assert item.stop == len(self.hardware.frame)
+        assert item.step is None
+        return self.hardware.frame
+
+    def close(self):
+        pass
+
+
 class Hardware:
-    def __init__(self, filename="/dev/myvideo"):
+    def __init__(self, filename="/dev/video39"):
         self.filename = filename
         self.fd = None
         self.fobj = None
@@ -28,13 +56,22 @@ class Hardware:
         self.bus_info = b"mock:usb"
         self.version = 5 << 16 | 4 << 8 | 12
         self.version_str = "5.4.12"
+        self.video_capture_state = "OFF"
+        self.blocking = None
+        self.frame = 640 * 480 * 3 * b"\x01"
 
     def __enter__(self):
         self.stack = ExitStack()
         ioctl = mock.patch("v4l2py.device.fcntl.ioctl", self.ioctl)
         opener = mock.patch("v4l2py.io.open", self.open)
+        mmap = mock.patch("v4l2py.device.mmap.mmap", self.mmap)
+        select = mock.patch("v4l2py.io.IO.select", self.select)
+        blocking = mock.patch("v4l2py.device.os.get_blocking", self.get_blocking)
         self.stack.enter_context(ioctl)
         self.stack.enter_context(opener)
+        self.stack.enter_context(mmap)
+        self.stack.enter_context(select)
+        self.stack.enter_context(blocking)
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -44,15 +81,19 @@ class Hardware:
         self.fd = randint(100, 1000)
         self.fobj = mock.Mock()
         self.fobj.fileno.return_value = self.fd
-        self.fobj.get_blocking.return_value = True
+        self.fobj.get_blocking.return_value = False
         self.fobj.closed = False
         return self.fobj
+
+    def get_blocking(self, fd):
+        assert self.fd == fd
+        return self.fobj.get_blocking()
 
     @property
     def closed(self):
         return self.fd is not None
 
-    def ioctl(self, fd, ioc, arg):
+    def ioctl(self, fd, ioc, arg):  # noqa: C901
         assert self.fd == fd
         if isinstance(arg, raw.v4l2_input):
             if arg.index > 0:
@@ -70,22 +111,70 @@ class Hardware:
             arg.card = self.card
             arg.bus_info = self.bus_info
             arg.version = self.version
+        elif isinstance(arg, raw.v4l2_format):
+            if ioc == raw.VIDIOC_G_FMT:
+                arg.fmt.pix.width = 640
+                arg.fmt.pix.height = 480
+                arg.fmt.pix.pixelformat = raw.V4L2_PIX_FMT_RGB24
+        elif isinstance(arg, raw.v4l2_buffer):
+            if ioc == raw.VIDIOC_QUERYBUF:
+                pass
+            elif ioc == raw.VIDIOC_DQBUF:
+                arg.index = 0
+                arg.bytesused = len(self.frame)
+                arg.sequence = 123
+                arg.timestamp.secs = 123
+                arg.timestamp.usecs = 456789
+        elif ioc == raw.VIDIOC_STREAMON:
+            assert arg.value == raw.V4L2_BUF_TYPE_VIDEO_CAPTURE
+            self.video_capture_state = "ON"
+        elif ioc == raw.VIDIOC_STREAMOFF:
+            assert arg.value == raw.V4L2_BUF_TYPE_VIDEO_CAPTURE
+            self.video_capture_state = "OFF"
         return 0
 
+    def mmap(self, fd, length, offset):
+        assert self.fd == fd
+        return MemoryMap(self)
 
-@pytest.mark.parametrize(
-    "filename, expected",
-    [
-        ("/dev/video0", 0),
-        ("/dev/video1", 1),
-        ("/dev/video999", 999),
-    ],
-)
-def test_device_number(filename, expected):
+    def select(self, readers, writers, other):
+        assert readers[0].fileno() == self.fd
+        return readers, writers, other
+
+
+@fixture
+def hardware():
+    with Hardware() as hardware:
+        yield hardware
+
+
+def assert_frame(frame, camera):
+    """Helper to compare frame with hardware frame"""
+    assert frame.data == camera.frame
+    assert frame.width == 640
+    assert frame.height == 480
+    assert frame.pixel_format == PixelFormat.RGB24
+    assert frame.index == 0
+    assert frame.frame_nb == 123
+    assert frame.type == BufferType.VIDEO_CAPTURE
+    assert isclose(frame.timestamp, 123.456789)
+    assert bytes(frame) == camera.frame
+    assert len(frame) == len(camera.frame)
+    assert frame.nbytes == len(camera.frame)
+    if numpy:
+        assert numpy.all(frame.array == numpy.frombuffer(camera.frame, dtype="u1"))
+
+
+@test("device number")
+def _(
+    filename=each("/dev/video0", "/dev/video1", "/dev/video999"),
+    expected=each(0, 1, 999),
+):
     assert device_number(filename) == expected
 
 
-def test_video_files():
+@test("video files")
+def _():
     with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
         expected_files = ["/dev/video0", "/dev/video55"]
         glob.return_value = expected_files
@@ -93,7 +182,8 @@ def test_video_files():
         assert list(iter_video_files()) == expected_files
 
 
-def test_device_list():
+@test("device list")
+def _():
     assert isgenerator(iter_devices())
 
     with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
@@ -108,7 +198,8 @@ def test_device_list():
         }
 
 
-def test_device_creation():
+@test("device creation")
+def _():
     # This should not raise an error until open() is called
     device = Device("/unknown")
     assert str(device.filename) == "/unknown"
@@ -116,11 +207,12 @@ def test_device_creation():
     assert device.closed
 
     for name in (1, 1.1, True, [], {}, (), set()):
-        with pytest.raises(TypeError):
+        with raises(TypeError):
             Device(name)
 
 
-def test_device_creation_from_id():
+@test("device creation from id")
+def _():
     # This should not raise an error until open() is called
     device = Device.from_id(33)
     assert str(device.filename) == "/dev/video33"
@@ -128,40 +220,71 @@ def test_device_creation_from_id():
     assert device.closed
 
 
-def test_device_open():
-    with Hardware() as hw:
-        device = Device(hw.filename)
-        hw.fobj is None
-        assert device.closed
-        assert device.info is None
-        device.open()
-        assert not device.closed
-        assert device.info is not None
-        assert device.fileno() == hw.fd
+@test("device open")
+def _(camera=hardware):
+    device = Device(camera.filename)
+    assert camera.fobj is None
+    assert device.closed
+    assert device.info is None
+    device.open()
+    assert not device.closed
+    assert device.info is not None
+    assert device.fileno() == camera.fd
 
 
-def test_device_info():
-    with Hardware() as hw:
-        device = Device(hw.filename)
-        device.opener = hw.open
-        assert device.info is None
-        device.open()
-        assert device.info.driver == hw.driver.decode()
-        assert device.info.bus_info == hw.bus_info.decode()
-        assert device.info.bus_info == hw.bus_info.decode()
-        assert device.info.version == hw.version_str
+@test("device close")
+def _(camera=hardware):
+    device = Device(camera.filename)
+    assert camera.fobj is None
+    assert device.closed
+    assert device.info is None
+    device.open()
+    assert not device.closed
+    assert device.info is not None
+    assert device.fileno() == camera.fd
+    device.close()
+    assert device.closed
 
 
-def test_device_repr():
-    with Hardware() as hw:
-        device = Device(hw.filename)
-        assert repr(device) == f"<Device name={hw.filename}, closed=True>"
-        device.open()
-        assert repr(device) == f"<Device name={hw.filename}, closed=False>"
+@test("device info")
+def _(camera=hardware):
+    device = Device(camera.filename)
+    device.opener = camera.open
+    assert device.info is None
+    device.open()
+    assert device.info.driver == camera.driver.decode()
+    assert device.info.bus_info == camera.bus_info.decode()
+    assert device.info.bus_info == camera.bus_info.decode()
+    assert device.info.version == camera.version_str
 
 
-def test_create_video_capture():
-    with Hardware() as hw:
-        device = Device(hw.filename)
-        video_capture = VideoCapture(device)
-        assert video_capture.device is device
+@test("device repr")
+def _(camera=hardware):
+    device = Device(camera.filename)
+    assert repr(device) == f"<Device name={camera.filename}, closed=True>"
+    device.open()
+    assert repr(device) == f"<Device name={camera.filename}, closed=False>"
+
+
+@test("create video capture")
+def _(camera=hardware):
+    device = Device(camera.filename)
+    video_capture = VideoCapture(device)
+    assert video_capture.device is device
+
+
+@test("synch device acquisition")
+def _(camera=hardware):
+    with Device(camera.filename) as device:
+        stream = iter(device)
+        frame = next(stream)
+        assert_frame(frame, camera)
+
+
+@test("synch video capture acquisition")
+def _(camera=hardware):
+    with Device(camera.filename) as device:
+        with VideoCapture(device) as video_capture:
+            for frame in video_capture:
+                assert_frame(frame, camera)
+                break

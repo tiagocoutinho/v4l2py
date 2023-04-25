@@ -1,0 +1,88 @@
+[project]
+name = "v4l2py"
+description = "Human friendly video for linux"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    { name = "Jose Tiago Macara Coutinho", email = "coutinhotiago@gmail.com" }
+]
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Video :: Capture",
+]
+dependencies = []
+dynamic = ["version", "readme"]
+
+[project.urls]
+#Changelog = "https://github.com/encode/httpx/blob/master/CHANGELOG.md"
+Documentation = "https://github.com/tiagocoutinho/v4l2py"
+Homepage = "https://github.com/tiagocoutinho/v4l2py"
+Source = "https://github.com/tiagocoutinho/v4l2py"
+
+[project.optional-dependencies]
+build = [
+    "build>=0.10.0",
+    "twine>=4.0.2",
+]
+dev = [
+    "black>=23.3.0",
+    "build>=0.10.0",
+    "ruff>=0.0.261",
+    "twine>=4.0.2",
+    "ward>=0.67.0b0",
+    "ward-coverage>=0.3.0",
+]
+test = [ 
+    "ward>=0.67.0b0",
+    "ward-coverage>=0.3.0",
+]
+
+[build-system]
+requires = ["setuptools >= 40.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["v4l2py"]
+
+[tool.setuptools.dynamic]
+version = {attr = "v4l2py.__version__"}
+readme = {file = ["README.md"], content-type = "text/markdown"}
+
+[tool.ward]
+order = "standard"
+fail-limit=10
+path = ["tests"]
+progress-style = ["inline"]
+test_output_style = "test-per-line"
+hook_module = ["ward_coverage"]
+show-slowest = 3
+
+[tool.ward.plugins.coverage]
+report_type = ["term", "html"]
+omit = ["*test*"]
+report = {skip_empty = true}
+branch = true
+
+[tool.ruff]
+select = ["E", "F", "W", "C", "B", "B9", "I001"]
+ignore = ["B904", "B028", "C901", ]
+line-length = 120
+target-version = "py37"
+
+[tool.ruff.isort]
+combine-as-imports = true
+
+[tool.ruff.per-file-ignores]
+"examples/web/async.py" = ["B008"]
+"tests/test_device.py" = ["B008"]

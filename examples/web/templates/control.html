@@ -24,7 +24,7 @@
             <input type="checkbox" class="form-check-input"
                  name="value"
                  id="checkbox-{{did}}-{{control.id}}"
-                 hx-post="/camera/{{did}}/control/{{control.id}}/{{"0" if value else "1"}}"
+                 hx-post="/camera/{{did}}/control/{{control.id}}"
                  {{"checked" if value else "" }}
             >
             <label class="form-check-label" for="checkbox-{{did}}-{{control.id}}" >
@@ -32,7 +32,7 @@
             </label>
         </div>
     # elif control.type == ControlType.MENU:
-        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example"
+        <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg"
             name="value"
             hx-post="/camera/{{did}}/control/{{control.id}}"
         >

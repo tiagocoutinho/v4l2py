@@ -17,13 +17,11 @@ import mmap
 import os
 import pathlib
 import typing
-
 from io import IOBase
 from collections import UserDict
 
 from . import raw
 from .io import IO, fopen
-
 
 log = logging.getLogger(__name__)
 log_ioctl = log.getChild("ioctl")
@@ -77,7 +75,8 @@ PixelFormat.human_str = lambda self: human_pixel_format(self.value)
 
 Info = collections.namedtuple(
     "Info",
-    "driver card bus_info version capabilities device_capabilities crop_capabilities buffers formats frame_sizes inputs controls",
+    "driver card bus_info version capabilities device_capabilities "
+    "crop_capabilities buffers formats frame_sizes inputs controls",
 )
 
 ImageFormat = collections.namedtuple(
@@ -115,12 +114,12 @@ buffers = {buffers}
 
 
 def ioctl(fd, request, arg):
-    log_ioctl.debug("%d, request=%s, arg=%s", fd, request.name, arg)
+    log_ioctl.debug("%s, request=%s, arg=%s", fd, request.name, arg)
     return fcntl.ioctl(fd, request.value, arg)
 
 
 def mem_map(fd, length, offset):
-    log_mmap.debug("%d, length=%d, offset=%d", fd, length, offset)
+    log_mmap.debug("%s, length=%d, offset=%d", fd, length, offset)
     return mmap.mmap(fd, length, offset=offset)
 
 
@@ -180,12 +179,12 @@ def iter_read(fd, ioc, indexed_struct, start=0, stop=128, step=1, ignore_einval=
 
 def frame_sizes(fd, pixel_formats):
     def get_frame_intervals(fmt, w, h):
-        val = raw.v4l2_frmivalenum()
-        val.pixel_format = fmt
-        val.width = w
-        val.height = h
+        value = raw.v4l2_frmivalenum()
+        value.pixel_format = fmt
+        value.width = w
+        value.height = h
         res = []
-        for val in iter_read(fd, IOC.ENUM_FRAMEINTERVALS, val):
+        for val in iter_read(fd, IOC.ENUM_FRAMEINTERVALS, value):
             # values come in frame interval (fps = 1/interval)
             try:
                 ftype = FrameIntervalType(val.type)
@@ -252,10 +251,10 @@ def read_capabilities(fd):
 
 
 def iter_read_formats(fd, type):
-    fmt = raw.v4l2_fmtdesc()
-    fmt.type = type
+    format = raw.v4l2_fmtdesc()
+    format.type = type
     pixel_formats = set(PixelFormat)
-    for fmt in iter_read(fd, IOC.ENUM_FMT, fmt):
+    for fmt in iter_read(fd, IOC.ENUM_FMT, format):
         pixel_fmt = fmt.pixelformat
         if pixel_fmt not in pixel_formats:
             log.warning(
@@ -274,8 +273,8 @@ def iter_read_formats(fd, type):
 
 
 def iter_read_inputs(fd):
-    inp = raw.v4l2_input()
-    for inp in iter_read(fd, IOC.ENUMINPUT, inp):
+    input = raw.v4l2_input()
+    for inp in iter_read(fd, IOC.ENUMINPUT, input):
         input_type = Input(
             index=inp.index,
             name=inp.name.decode(),
@@ -290,10 +289,10 @@ def iter_read_inputs(fd):
 
 
 def iter_read_controls(fd):
-    ctrl_ext = raw.v4l2_query_ext_ctrl()
+    ctrl = raw.v4l2_query_ext_ctrl()
     nxt = ControlFlag.NEXT_CTRL | ControlFlag.NEXT_COMPOUND
-    ctrl_ext.id = nxt
-    for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl_ext):
+    ctrl.id = nxt
+    for ctrl_ext in iter_read(fd, IOC.QUERY_EXT_CTRL, ctrl):
         if not (ctrl_ext.flags & ControlFlag.DISABLED) and not (
             ctrl_ext.type == ControlType.CTRL_CLASS
         ):
@@ -302,12 +301,12 @@ def iter_read_controls(fd):
 
 
 def iter_read_menu(fd, ctrl):
-    menu = raw.v4l2_querymenu()
-    menu.id = ctrl.id
+    qmenu = raw.v4l2_querymenu()
+    qmenu.id = ctrl.id
     for menu in iter_read(
         fd,
         IOC.QUERYMENU,
-        menu,
+        qmenu,
         start=ctrl._info.minimum,
         stop=ctrl._info.maximum + 1,
         step=ctrl._info.step,
@@ -584,7 +583,8 @@ def set_priority(fd, priority: Priority):
 
 def create_buffer(fd, buffer_type: BufferType, memory: Memory) -> raw.v4l2_buffer:
     """request + query buffers"""
-    return create_buffer(fd, buffer_type, memory, 1)
+    buffers = create_buffers(fd, buffer_type, memory, 1)
+    return buffers[0]
 
 
 def create_buffers(
@@ -653,7 +653,9 @@ class Device(ReentrantContextManager):
             self._context_level += 1
             self._init()
         else:
-            raise TypeError(f"name_or_file must be str or a file-like object, not {name_or_file.__class__.__name__}")
+            raise TypeError(
+                f"name_or_file must be str or a file-like object, not {name_or_file.__class__.__name__}"
+            )
         self.log = log.getChild(filename.stem)
         self.filename = filename
         self.index = device_number(filename)
@@ -806,7 +808,9 @@ class Controls(dict):
             return self[key]
         except KeyError:
             pass
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{key}'"
+        )
 
     def __setattr__(self, key, value):
         self[key] = value
@@ -824,7 +828,7 @@ class Controls(dict):
         raise KeyError(key)
 
     def used_classes(self):
-        return set([v.control_class for v in self.values() if isinstance(v, BaseControl)])
+        return {v.control_class for v in self.values() if isinstance(v, BaseControl)}
 
     def with_class(self, control_class):
         if isinstance(control_class, ControlClass):
@@ -835,7 +839,9 @@ class Controls(dict):
                 raise ValueError(f"{control_class} is no valid ControlClass")
             control_class = cl[0]
         else:
-            raise TypeError(f"control_class expected as ControlClass or str, not {control_class.__class__.__name__}")
+            raise TypeError(
+                f"control_class expected as ControlClass or str, not {control_class.__class__.__name__}"
+            )
 
         for v in self.values():
             if isinstance(v, BaseControl) and (v.control_class == control_class):
@@ -1280,7 +1286,10 @@ class Frame:
         return self.data[index]
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} width={self.width}, height={self.height}, format={self.pixel_format.name}, frame_nb={self.frame_nb}, timestamp={self.timestamp}>"
+        return (
+            f"<{type(self).__name__} width={self.width}, height={self.height}, "
+            f"format={self.pixel_format.name}, frame_nb={self.frame_nb}, timestamp={self.timestamp}>"
+        )
 
     @property
     def width(self):
@@ -1351,7 +1360,7 @@ class VideoCapture(BufferManager):
 
     def __enter__(self):
         self.open()
-        return self.buffer
+        return self
 
     def __exit__(self, *exc):
         self.close()
@@ -1376,6 +1385,7 @@ class VideoCapture(BufferManager):
             self.device.log.info("Closing video capture...")
             self.stream_off()
             self.buffer.close()
+            self.buffer = None
             self.device.log.info("Video capture closed")
 
 
@@ -1395,7 +1405,7 @@ class MemoryMap(ReentrantContextManager):
             yield self.read()
 
     async def __aiter__(self):
-        device = self.device
+        device = self.device.fileno()
         loop = asyncio.get_event_loop()
         event = asyncio.Event()
         frame = None

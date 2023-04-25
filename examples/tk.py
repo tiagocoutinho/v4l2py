@@ -12,7 +12,6 @@ from PIL import Image, ImageTk
 
 from v4l2py import Device, VideoCapture
 
-
 fmt = "%(threadName)-10s %(asctime)-15s %(levelname)-5s %(name)s: %(message)s"
 logging.basicConfig(level="INFO", format=fmt)
 
