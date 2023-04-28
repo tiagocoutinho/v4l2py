@@ -1032,7 +1032,7 @@ class BaseControl:
 
 class BaseNumericControl(BaseControl):
     lower_bound = -(2**31)
-    upper_bound = 2**31
+    upper_bound = 2**31 - 1
 
     def __init__(self, device, info, clipping=True):
         super().__init__(device, info)
@@ -1103,12 +1103,12 @@ class BaseNumericControl(BaseControl):
 
 class IntegerControl(BaseNumericControl):
     lower_bound = -(2**31)
-    upper_bound = 2**31
+    upper_bound = 2**31 - 1
 
 
 class Integer64Control(BaseNumericControl):
     lower_bound = -(2**63)
-    upper_bound = 2**63
+    upper_bound = 2**63 - 1
 
 
 class BooleanControl(BaseControl):
