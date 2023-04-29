@@ -801,7 +801,7 @@ class Controls(dict):
 
         for ctrl in device.info.controls:
             ctrl_type = ControlType(ctrl.type)
-            ctrl_class = ctrl_type_map.get(ctrl_type, LegacyControl)
+            ctrl_class = ctrl_type_map.get(ctrl_type, GenericControl)
             ctrl_dict[ctrl.id] = ctrl_class(device, ctrl)
 
         return cls(ctrl_dict)
@@ -1031,6 +1031,10 @@ class BaseControl:
 
     def set_to_default(self):
         self.value = self.default
+
+
+class GenericControl(BaseControl):
+    pass
 
 
 class BaseNumericControl(BaseControl):
