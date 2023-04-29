@@ -793,6 +793,9 @@ class Controls(dict):
             ControlType.INTEGER64: Integer64Control,
             ControlType.MENU: MenuControl,
             ControlType.INTEGER_MENU: MenuControl,
+            ControlType.U8: U8Control,
+            ControlType.U16: U16Control,
+            ControlType.U32: U32Control,
         }
         ctrl_dict = dict()
 
@@ -1109,6 +1112,21 @@ class IntegerControl(BaseNumericControl):
 class Integer64Control(BaseNumericControl):
     lower_bound = -(2**63)
     upper_bound = 2**63 - 1
+
+
+class U8Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**8
+
+
+class U16Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**16
+
+
+class U32Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**32
 
 
 class BooleanControl(BaseControl):
