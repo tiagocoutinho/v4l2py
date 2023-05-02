@@ -911,6 +911,26 @@ class BaseControl:
     def _get_repr(self) -> str:
         return ""
 
+    def _get_control(self):
+        value = get_control(self.device, self.id)
+        return value
+
+    def _set_control(self, value):
+        if not self.is_writeable:
+            reasons = []
+            if self.is_flagged_read_only:
+                reasons.append("read-only")
+            if self.is_flagged_inactive:
+                reasons.append("inactive")
+            if self.is_flagged_disabled:
+                reasons.append("disabled")
+            if self.is_flagged_grabbed:
+                reasons.append("grabbed")
+            raise AttributeError(
+                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
+            )
+        set_control(self.device, self.id, value)
+
     @property
     def config_name(self) -> str:
         if self._config_name is None:
@@ -1003,7 +1023,7 @@ class BaseMonoControl(BaseControl):
     @property
     def value(self):
         if not self.is_flagged_write_only:
-            v = get_control(self.device, self.id)
+            v = self._get_control()
             return self._convert_read(v)
         else:
             return None
@@ -1016,22 +1036,9 @@ class BaseMonoControl(BaseControl):
 
     @value.setter
     def value(self, value):
-        if not self.is_writeable:
-            reasons = []
-            if self.is_flagged_read_only:
-                reasons.append("read-only")
-            if self.is_flagged_inactive:
-                reasons.append("inactive")
-            if self.is_flagged_disabled:
-                reasons.append("disabled")
-            if self.is_flagged_grabbed:
-                reasons.append("grabbed")
-            raise AttributeError(
-                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
-            )
         v = self._convert_write(value)
         v = self._mangle_write(v)
-        set_control(self.device, self.id, v)
+        self._set_control(v)
 
     def set_to_default(self):
         self.value = self.default
@@ -1187,6 +1194,11 @@ class MenuControl(BaseMonoControl, UserDict):
 
     def _convert_write(self, value):
         return int(value)
+
+
+class ButtonControl(BaseControl):
+    def push(self):
+        self._set_control(1)
 
 
 class BaseCompoundControl(BaseControl):
