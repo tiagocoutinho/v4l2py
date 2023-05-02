@@ -898,10 +898,6 @@ class BaseControl:
         if addrepr:
             repr += f" {addrepr}"
 
-        repr += f" default={self.default}"
-        if not self.is_flagged_write_only:
-            repr += f" value={self.value}"
-
         flags = [
             flag.name.lower()
             for flag in ControlFlag
@@ -925,46 +921,6 @@ class BaseControl:
                 res = res.replace(r, "_")
             self._config_name = res
         return self._config_name
-
-    def _convert_read(self, value):
-        return value
-
-    @property
-    def default(self):
-        return self._convert_read(self._info.default_value)
-
-    @property
-    def value(self):
-        if not self.is_flagged_write_only:
-            v = get_control(self.device, self.id)
-            return self._convert_read(v)
-        else:
-            return None
-
-    def _convert_write(self, value):
-        return value
-
-    def _mangle_write(self, value):
-        return value
-
-    @value.setter
-    def value(self, value):
-        if not self.is_writeable:
-            reasons = []
-            if self.is_flagged_read_only:
-                reasons.append("read-only")
-            if self.is_flagged_inactive:
-                reasons.append("inactive")
-            if self.is_flagged_disabled:
-                reasons.append("disabled")
-            if self.is_flagged_grabbed:
-                reasons.append("grabbed")
-            raise AttributeError(
-                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
-            )
-        v = self._convert_write(value)
-        v = self._mangle_write(v)
-        set_control(self.device, self.id, v)
 
     @property
     def is_flagged_disabled(self) -> bool:
@@ -1029,15 +985,63 @@ class BaseControl:
             or self.is_flagged_grabbed
         )
 
+
+class BaseMonoControl(BaseControl):
+    def _get_repr(self) -> str:
+        repr = f" default={self.default}"
+        if not self.is_flagged_write_only:
+            repr += f" value={self.value}"
+        return repr
+
+    def _convert_read(self, value):
+        return value
+
+    @property
+    def default(self):
+        return self._convert_read(self._info.default_value)
+
+    @property
+    def value(self):
+        if not self.is_flagged_write_only:
+            v = get_control(self.device, self.id)
+            return self._convert_read(v)
+        else:
+            return None
+
+    def _convert_write(self, value):
+        return value
+
+    def _mangle_write(self, value):
+        return value
+
+    @value.setter
+    def value(self, value):
+        if not self.is_writeable:
+            reasons = []
+            if self.is_flagged_read_only:
+                reasons.append("read-only")
+            if self.is_flagged_inactive:
+                reasons.append("inactive")
+            if self.is_flagged_disabled:
+                reasons.append("disabled")
+            if self.is_flagged_grabbed:
+                reasons.append("grabbed")
+            raise AttributeError(
+                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
+            )
+        v = self._convert_write(value)
+        v = self._mangle_write(v)
+        set_control(self.device, self.id, v)
+
     def set_to_default(self):
         self.value = self.default
 
 
-class GenericControl(BaseControl):
+class GenericControl(BaseMonoControl):
     pass
 
 
-class BaseNumericControl(BaseControl):
+class BaseNumericControl(BaseMonoControl):
     lower_bound = -(2**31)
     upper_bound = 2**31 - 1
 
@@ -1059,6 +1063,7 @@ class BaseNumericControl(BaseControl):
 
     def _get_repr(self) -> str:
         repr = f" min={self.minimum} max={self.maximum} step={self.step}"
+        repr += super()._get_repr()
         return repr
 
     def _convert_read(self, value):
@@ -1133,7 +1138,7 @@ class U32Control(BaseNumericControl):
     upper_bound = 2**32
 
 
-class BooleanControl(BaseControl):
+class BooleanControl(BaseMonoControl):
     _true = ["true", "1", "yes", "on", "enable"]
     _false = ["false", "0", "no", "off", "disable"]
 
@@ -1160,7 +1165,7 @@ class BooleanControl(BaseControl):
         )
 
 
-class MenuControl(BaseControl, UserDict):
+class MenuControl(BaseMonoControl, UserDict):
     def __init__(self, device, info):
         BaseControl.__init__(self, device, info)
         UserDict.__init__(self)
