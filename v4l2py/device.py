@@ -684,6 +684,9 @@ class Device(ReentrantContextManager):
         else:
             self.controls = Controls.from_device(self)
 
+    def _reset(self):
+        self.controls = None
+
     def open(self):
         if not self._fobj:
             self.log.info("opening %s", self.filename)
@@ -696,6 +699,7 @@ class Device(ReentrantContextManager):
             self.log.info("closing %s (%s)", self.filename, self.info.card)
             self._fobj.close()
             self._fobj = None
+            self._reset()
             self.log.info("closed %s (%s)", self.filename, self.info.card)
 
     def fileno(self):
