@@ -1160,9 +1160,10 @@ class BooleanControl(BaseMonoControl):
         if isinstance(value, bool):
             return value
         elif isinstance(value, str):
-            if value in self._true:
+            v = value.lower()
+            if v in self._true:
                 return True
-            elif value in self._false:
+            elif v in self._false:
                 return False
         else:
             try:
