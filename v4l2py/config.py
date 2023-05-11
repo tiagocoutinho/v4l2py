@@ -80,7 +80,6 @@ class ConfigManager:
 
     def load(self, filename) -> None:
         self.log.info(f"reading configuration from {filename}")
-
         if isinstance(filename, pathlib.Path):
             pass
         elif isinstance(filename, str):
@@ -106,6 +105,7 @@ class ConfigManager:
         self.log.info("validating configuration")
         if not self.config_loaded:
             raise RuntimeError("Load configuration first")
+
         for section in ("controls",):
             if not self.config.has_section(section):
                 raise ConfigurationError(f"Mandatory section '{section}' is missing")
