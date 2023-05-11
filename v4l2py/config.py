@@ -8,9 +8,21 @@ import logging
 import pathlib
 import configparser
 
-from .device import Device
+from .device import Device, V4L2Error
 
 log = logging.getLogger(__name__)
+
+
+class ConfigurationError(V4L2Error):
+    pass
+
+
+class CompatibilityError(V4L2Error):
+    pass
+
+
+class DeviceStateError(V4L2Error):
+    pass
 
 
 class ConfigManager:
@@ -58,7 +70,7 @@ class ConfigManager:
             raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
 
         if self.device.closed:
-            raise RuntimeError(f"{self.device}: must be opened to save configuration")
+            raise V4L2Error(f"{self.device} must be opened to save configuration")
         if not self.config or not self.config.sections():
             self.acquire()
 
@@ -79,7 +91,7 @@ class ConfigManager:
         if not (filename.exists() and filename.is_file()):
             raise RuntimeError(f"{filename} must be an existing file")
         if self.device.closed:
-            raise RuntimeError(f"{self.device}: must be opened to load configuration")
+            raise V4L2Error(f"{self.device} must be opened to load configuration")
 
         self.reset()
         res = self.config.read((filename,))
@@ -96,15 +108,15 @@ class ConfigManager:
             raise RuntimeError("Load configuration first")
         for section in ("controls",):
             if not self.config.has_section(section):
-                raise RuntimeError(f"Mandatory section '{section}' is missing")
+                raise ConfigurationError(f"Mandatory section '{section}' is missing")
         controls = self.device.controls.named_keys()
         for ctrl, _ in self.config.items("controls"):
             if ctrl not in controls:
-                raise RuntimeError(f"{self.device.filename} has no control named {ctrl}")
+                raise CompatibilityError(f"{self.device.filename} has no control named {ctrl}")
 
         if pedantic:
             if not self.config.has_section("device"):
-                raise RuntimeError("Section 'device' is missing")
+                raise ConfigurationError("Section 'device' is missing")
             for (option, have) in (
                 ("card", str(self.device.info.card)),
                 ("driver", str(self.device.info.driver)),
@@ -112,13 +124,15 @@ class ConfigManager:
             ):
                 want = self.config["device"][option]
                 if not (want == have):
-                    raise RuntimeError(f"{option.title()} mismatch: want '{want}', have '{have}'")
+                    raise CompatibilityError(f"{option.title()} mismatch: want '{want}', have '{have}'")
         self.log.info("configuration validated")
 
     def apply(self, cycles: int = 2) -> None:
         self.log.info("applying configuration")
         if not self.config_loaded:
             raise RuntimeError("Load configuration first")
+        if self.device.closed:
+            raise V4L2Error(f"{self.device} must be opened to apply configuration")
 
         for cycle in range(1, cycles + 1):
             for ctrl, value in self.config.items("controls"):
@@ -138,13 +152,15 @@ class ConfigManager:
         self.log.info("verifying device configuration")
         if not self.config_loaded:
             raise RuntimeError("Load configuration first")
+        if self.device.closed:
+            raise V4L2Error(f"{self.device} must be opened to verify configuration")
 
         for ctrl, value in self.config.items("controls"):
             if not self.device.controls[ctrl].is_flagged_write_only:
                 cur = str(self.device.controls[ctrl].value)
                 self.log.debug(f"{ctrl}: want {value}, have {cur}")
                 if not cur.lower() == value.lower():
-                    raise RuntimeError(f"{ctrl} should be {value}, but is {cur}")
+                    raise DeviceStateError(f"{ctrl} should be {value}, but is {cur}")
             else:
                 self.log.debug(f"{ctrl} skipped (not readable)")
         self.log.info("device is configured correctly")
