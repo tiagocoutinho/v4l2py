@@ -53,7 +53,8 @@ class ConfigManager:
             "driver": str(self.device.info.driver),
             "card": str(self.device.info.card),
             "bus_info": str(self.device.info.bus_info),
-            "version": str(self.device.info.version)
+            "version": str(self.device.info.version),
+            "legacy_controls": str(self.device.legacy_controls),
         }
         self.config["controls"] = {}
         for c in self.device.controls.values():
@@ -121,6 +122,7 @@ class ConfigManager:
                 ("card", str(self.device.info.card)),
                 ("driver", str(self.device.info.driver)),
                 ("version", str(self.device.info.version)),
+                ("legacy_controls", str(self.device.legacy_controls)),
             ):
                 want = self.config["device"][option]
                 if not (want == have):
