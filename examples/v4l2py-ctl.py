@@ -1,6 +1,8 @@
 import argparse
+import pathlib
 
 from v4l2py.device import Device, MenuControl, LegacyControl
+from v4l2py.config import ConfigManager
 
 
 def _get_ctrl(cam, control):
@@ -126,6 +128,40 @@ def reset_all_controls(device: str, legacy_controls: bool) -> None:
         cam.controls.set_to_default()
 
 
+def save_to_file(device: str, legacy_controls: bool, filename) -> None:
+    if isinstance(filename, pathlib.Path):
+        pass
+    elif isinstance(filename, str):
+        filename = pathlib.Path(filename)
+    else:
+        raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+
+    with Device(device, legacy_controls) as cam:
+        print(f"Saving device configuration to {filename.resolve()}")
+        cfg = ConfigManager(cam)
+        cfg.acquire()
+        cfg.save(filename)
+    print("")
+
+
+def load_from_file(device: str, legacy_controls: bool, filename, pedantic: bool) -> None:
+    if isinstance(filename, pathlib.Path):
+        pass
+    elif isinstance(filename, str):
+        filename = pathlib.Path(filename)
+    else:
+        raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+
+    with Device(device, legacy_controls) as cam:
+        print(f"Loading device configuration from {filename.resolve()}")
+        cfg = ConfigManager(cam)
+        cfg.load(filename)
+        cfg.validate(pedantic=pedantic)
+        cfg.apply()
+        cfg.verify()
+    print("")
+
+
 def csv(string: str) -> list:
     return [v.strip() for v in string.split(",")]
 
@@ -178,6 +214,28 @@ if __name__ == "__main__":
         action="store_true",
         help="reset all controls to their default value",
     )
+    parser.add_argument(
+        "--save",
+        type=str,
+        dest="save_file",
+        default=None,
+        metavar="<filename>",
+        help="save current configuration to <filename>",
+    )
+    parser.add_argument(
+        "--load",
+        type=str,
+        dest="load_file",
+        default=None,
+        metavar="<filename>",
+        help="load configuration from <filename> and apply it to selected device",
+    )
+    parser.add_argument(
+        "--pedantic",
+        default=False,
+        action="store_true",
+        help="be pedantic when validating a configuration (--load only)"
+    )
 
     args = parser.parse_args()
 
@@ -194,6 +252,10 @@ if __name__ == "__main__":
         get_controls(dev, args.get_ctrl, args.legacy)
     elif args.set_ctrl:
         set_controls(dev, args.set_ctrl, args.legacy, args.clipping)
+    elif args.save_file is not None:
+        save_to_file(dev, args.legacy, args.save_file)
+    elif args.load_file is not None:
+        load_from_file(dev, args.legacy, args.load_file, args.pedantic)
     else:
         show_control_status(dev, args.legacy)
 
