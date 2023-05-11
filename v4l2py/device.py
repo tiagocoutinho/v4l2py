@@ -1347,6 +1347,31 @@ class ConfigManager:
             self.filename = filename.resolve()
         self.log.info(f"configuration read from {self.filename}")
 
+    def validate(self, pedantic: bool = False) -> None:
+        self.log.info("validating configuration")
+        if not self.config_loaded:
+            raise RuntimeError("Load configuration first")
+        for section in ("controls",):
+            if not self.config.has_section(section):
+                raise RuntimeError(f"Mandatory section '{section}' is missing")
+        controls = self.device.controls.named_keys()
+        for ctrl, _ in self.config.items("controls"):
+            if ctrl not in controls:
+                raise RuntimeError(f"{self.device.filename} has no control named {ctrl}")
+
+        if pedantic:
+            if not self.config.has_section("device"):
+                raise RuntimeError("Section 'device' is missing")
+            for (option, have) in (
+                ("card", str(self.device.info.card)),
+                ("driver", str(self.device.info.driver)),
+                ("version", str(self.device.info.version)),
+            ):
+                want = self.config["device"][option]
+                if not (want == have):
+                    raise RuntimeError(f"{option.title()} mismatch: want '{want}', have '{have}'")
+        self.log.info("configuration validated")
+
     def apply(self, cycles: int = 2) -> None:
         self.log.info("applying configuration")
         if not self.config_loaded:
@@ -1374,7 +1399,7 @@ class ConfigManager:
         for ctrl, value in self.config.items("controls"):
             if not self.device.controls[ctrl].is_flagged_write_only:
                 cur = str(self.device.controls[ctrl].value)
-                self.log.debug(f"{ctrl}: should: {value}, is: {cur}")
+                self.log.debug(f"{ctrl}: want {value}, have {cur}")
                 if not cur.lower() == value.lower():
                     raise RuntimeError(f"{ctrl} should be {value}, but is {cur}")
             else:
