@@ -835,6 +835,9 @@ class Controls(dict):
                 return v
         raise KeyError(key)
 
+    def named_keys(self):
+        return [v.config_name for v in self.values() if isinstance(v, BaseControl)]
+
     def used_classes(self):
         return {v.control_class for v in self.values() if isinstance(v, BaseControl)}
 
