@@ -188,24 +188,10 @@ def csv(string: str) -> list:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--legacy",
-        default=False,
-        action="store_true",
-        help="use legacy controls (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--clipping",
-        default=False,
-        action="store_true",
-        help="when changing numeric controls, enforce the written value to be within allowed range (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--list-devices",
-        default=False,
-        action="store_true",
-        help="list all video capture devices",
+    parser = argparse.ArgumentParser(
+        prog="v4l2py-ctl",
+        description="Example utility to control video capture devices.",
+        epilog="When no action is given, the control status of the selected device is shown.",
     )
     parser.add_argument(
         "--device",
@@ -214,34 +200,62 @@ if __name__ == "__main__":
         metavar="<dev>",
         help="use device <dev> instead of /dev/video0; if <dev> starts with a digit, then /dev/video<dev> is used",
     )
-    parser.add_argument(
+
+    flags = parser.add_argument_group("Flags")
+    flags.add_argument(
+        "--legacy",
+        default=False,
+        action="store_true",
+        help="use legacy controls (default: %(default)s)",
+    )
+    flags.add_argument(
+        "--clipping",
+        default=False,
+        action="store_true",
+        help="when changing numeric controls, enforce the written value to be within allowed range (default: %(default)s)",
+    )
+    flags.add_argument(
+        "--pedantic",
+        default=False,
+        action="store_true",
+        help="be pedantic when validating a loaded configuration (default: %(default)s)"
+    )
+
+    actions = parser.add_argument_group("Actions")
+    actions.add_argument(
+        "--list-devices",
+        default=False,
+        action="store_true",
+        help="list all video capture devices",
+    )
+    actions.add_argument(
         "--get-ctrl",
         type=csv,
         default=[],
         metavar="<ctrl>[,<ctrl>...]",
         help="get the values of the specified controls",
     )
-    parser.add_argument(
+    actions.add_argument(
         "--set-ctrl",
         type=csv,
         default=[],
         metavar="<ctrl>=<val>[,<ctrl>=<val>...]",
         help="set the values of the specified controls",
     )
-    parser.add_argument(
+    actions.add_argument(
         "--reset-ctrl",
         type=csv,
         default=[],
         metavar="<ctrl>[,<ctrl>...]",
         help="reset the specified controls to their default values",
     )
-    parser.add_argument(
+    actions.add_argument(
         "--reset-all",
         default=False,
         action="store_true",
         help="reset all controls to their default value",
     )
-    parser.add_argument(
+    actions.add_argument(
         "--save",
         type=str,
         dest="save_file",
@@ -249,19 +263,13 @@ if __name__ == "__main__":
         metavar="<filename>",
         help="save current configuration to <filename>",
     )
-    parser.add_argument(
+    actions.add_argument(
         "--load",
         type=str,
         dest="load_file",
         default=None,
         metavar="<filename>",
         help="load configuration from <filename> and apply it to selected device",
-    )
-    parser.add_argument(
-        "--pedantic",
-        default=False,
-        action="store_true",
-        help="be pedantic when validating a configuration (--load only)"
     )
 
     args = parser.parse_args()
