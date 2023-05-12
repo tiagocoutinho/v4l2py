@@ -2,6 +2,7 @@ import argparse
 import pathlib
 
 from v4l2py.device import Device, MenuControl, LegacyControl
+from v4l2py.device import iter_video_capture_devices, Capability
 from v4l2py.config import ConfigManager
 
 
@@ -17,6 +18,26 @@ def _get_ctrl(cam, control):
         return None
     else:
         return ctrl
+
+
+def list_devices() -> None:
+    print("Listing all video capture devices ...\n")
+    for dev in iter_video_capture_devices():
+        with dev as cam:
+            print(f"{cam.index:>2}: {cam.info.card}")
+            print(f"\tdriver  : {cam.info.driver}")
+            print(f"\tversion : {cam.info.version}")
+            print(f"\tbus     : {cam.info.bus_info}")
+            caps = [
+                cap.name.lower()
+                for cap in Capability
+                if ((cam.info.device_capabilities & cap) == cap)
+            ]
+            if caps:
+                print("\tcaps    :", ", ".join(caps))
+            else:
+                print("\tcaps    : none")
+        print()
 
 
 def show_control_status(device: str, legacy_controls: bool) -> None:
@@ -181,6 +202,12 @@ if __name__ == "__main__":
         help="when changing numeric controls, enforce the written value to be within allowed range (default: %(default)s)",
     )
     parser.add_argument(
+        "--list-devices",
+        default=False,
+        action="store_true",
+        help="list all video capture devices",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default="0",
@@ -244,7 +271,9 @@ if __name__ == "__main__":
     else:
         dev = args.device
 
-    if args.reset_all:
+    if args.list_devices:
+        list_devices()
+    elif args.reset_all:
         reset_all_controls(dev, args.legacy)
     elif args.reset_ctrl:
         reset_controls(dev, args.reset_ctrl, args.legacy)
