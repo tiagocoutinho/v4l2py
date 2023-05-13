@@ -155,7 +155,9 @@ def save_to_file(device: str, legacy_controls: bool, filename) -> None:
     elif isinstance(filename, str):
         filename = pathlib.Path(filename)
     else:
-        raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+        raise TypeError(
+            f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}"
+        )
 
     with Device(device, legacy_controls) as cam:
         print(f"Saving device configuration to {filename.resolve()}")
@@ -165,13 +167,17 @@ def save_to_file(device: str, legacy_controls: bool, filename) -> None:
     print("")
 
 
-def load_from_file(device: str, legacy_controls: bool, filename, pedantic: bool) -> None:
+def load_from_file(
+    device: str, legacy_controls: bool, filename, pedantic: bool
+) -> None:
     if isinstance(filename, pathlib.Path):
         pass
     elif isinstance(filename, str):
         filename = pathlib.Path(filename)
     else:
-        raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+        raise TypeError(
+            f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}"
+        )
 
     with Device(device, legacy_controls) as cam:
         print(f"Loading device configuration from {filename.resolve()}")
@@ -218,7 +224,7 @@ if __name__ == "__main__":
         "--pedantic",
         default=False,
         action="store_true",
-        help="be pedantic when validating a loaded configuration (default: %(default)s)"
+        help="be pedantic when validating a loaded configuration (default: %(default)s)",
     )
 
     actions = parser.add_argument_group("Actions")

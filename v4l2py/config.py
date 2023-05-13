@@ -34,7 +34,10 @@ class ConfigManager:
 
     @property
     def has_config(self) -> bool:
-        return isinstance(self.config, configparser.ConfigParser) and self.config.sections()
+        return (
+            isinstance(self.config, configparser.ConfigParser)
+            and self.config.sections()
+        )
 
     @property
     def config_loaded(self) -> bool:
@@ -68,7 +71,9 @@ class ConfigManager:
         elif isinstance(filename, str):
             filename = pathlib.Path(filename)
         else:
-            raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+            raise TypeError(
+                f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}"
+            )
 
         if self.device.closed:
             raise V4L2Error(f"{self.device} must be opened to save configuration")
@@ -86,7 +91,9 @@ class ConfigManager:
         elif isinstance(filename, str):
             filename = pathlib.Path(filename)
         else:
-            raise TypeError(f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}")
+            raise TypeError(
+                f"filename expected to be str or pathlib.Path, not {filename.__class__.__name__}"
+            )
 
         if not (filename.exists() and filename.is_file()):
             raise RuntimeError(f"{filename} must be an existing file")
@@ -113,12 +120,14 @@ class ConfigManager:
         controls = self.device.controls.named_keys()
         for ctrl, _ in self.config.items("controls"):
             if ctrl not in controls:
-                raise CompatibilityError(f"{self.device.filename} has no control named {ctrl}")
+                raise CompatibilityError(
+                    f"{self.device.filename} has no control named {ctrl}"
+                )
 
         if pedantic:
             if not self.config.has_section("device"):
                 raise ConfigurationError("Section 'device' is missing")
-            for (option, have) in (
+            for option, have in (
                 ("card", str(self.device.info.card)),
                 ("driver", str(self.device.info.driver)),
                 ("version", str(self.device.info.version)),
@@ -126,7 +135,9 @@ class ConfigManager:
             ):
                 want = self.config["device"][option]
                 if not (want == have):
-                    raise CompatibilityError(f"{option.title()} mismatch: want '{want}', have '{have}'")
+                    raise CompatibilityError(
+                        f"{option.title()} mismatch: want '{want}', have '{have}'"
+                    )
         self.log.info("configuration validated")
 
     def apply(self, cycles: int = 2) -> None:
