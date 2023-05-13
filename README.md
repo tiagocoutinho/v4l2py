@@ -122,7 +122,7 @@ Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 
 v4l2py is asyncio friendly:
 
-```bash
+```python
 $ python -m asyncio
 
 >>> from v4l2py import Device
@@ -142,7 +142,7 @@ frame 10136
 
 v4l2py is also gevent friendly:
 
-```
+```python
 $ python
 
 >>> from v4l2py import Device, GeventIO
@@ -157,6 +157,78 @@ frame 10136
 ```
 
 (check [basic gevent](examples/basic_gevent.py) and [web gevent](examples/web/sync.py) examples)
+
+## Configuration files
+
+v4l2py now supports configuration files, allowing to save the current settings
+(controls only at this time) of a device to a file:
+
+```python
+from v4l2py import Device
+from v4l2py.config import ConfigManager
+
+with Device.from_id(0) as cam:
+    cfg = ConfigManager(cam)
+    cfg.acquire()
+    cfg.save("cam.ini")
+...
+```
+
+The configuration is written to an ini-style file, which might look like this:
+
+```dosini
+[device]
+driver = uvcvideo
+card = Integrated Camera: Integrated C
+bus_info = usb-0000:00:14.0-8
+version = 6.1.15
+legacy_controls = False
+
+[controls]
+brightness = 128
+contrast = 32
+saturation = 64
+hue = 0
+white_balance_automatic = True
+...
+```
+
+When loading a configuration file, the content may be validated to ensure it
+fits the device it's going to be applied to, and after applying the
+configuration it can be verified that the device is in the state that the
+configuration file describes:
+
+```python
+from v4l2py import Device
+from v4l2py.config import ConfigManager
+
+with Device.from_id(0) as cam:
+    cfg = ConfigManager(cam)
+    cfg.load("cam.ini")
+    cfg.validate(pedantic=True)
+    cfg.apply()
+    cfg.verify()
+```
+
+[v4l2py-ctl](examples/v4l2py-ctl.py) can be used for that purpose, too:
+
+```bash
+$ python v4l2py-ctl.py --device /dev/video2 --reset-all
+Resetting all controls to default ...
+
+Done.
+$ python v4l2py-ctl.py --device /dev/video2 --save cam-defaults.ini
+Saving device configuration to /home/mrenzmann/src/v4l2py-o42/cam-defaults.ini
+
+Done.
+$
+$ # ... after messing around with the controls ...
+$ python v4l2py-ctl.py --device /dev/video2 --load cam-defaults.ini
+Loading device configuration from /home/mrenzmann/src/v4l2py-o42/cam-defaults.ini
+
+Done.
+$
+```
 
 ## Bonus track
 
