@@ -5,7 +5,7 @@
 ![License][license]
 [![CI][CI]](https://github.com/tiagocoutinho/v4l2py/actions/workflows/ci.yml)
 
-Video for linux 2 (V4L2) python library
+Video for Linux 2 (V4L2) python library
 
 A two purpose API:
 
