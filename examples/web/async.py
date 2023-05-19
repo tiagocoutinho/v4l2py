@@ -89,7 +89,7 @@ def cameras() -> list[Camera]:
     global CAMERAS
     if CAMERAS is None:
         cameras = {}
-        for device in iter_video_capture_devices():
+        for device in iter_video_capture_devices(legacy_controls=True):
             cameras[device.index] = Camera(device)
         CAMERAS = cameras
     return CAMERAS
