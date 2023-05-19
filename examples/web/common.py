@@ -35,22 +35,21 @@ class BaseCamera:
 
 
 def frame_to_image(frame, output="jpeg"):
-    match frame.pixel_format:
-        case PixelFormat.JPEG | PixelFormat.MJPEG:
-            if output == "jpeg":
-                return to_image_send(frame.data, type=output)
-            else:
-                buff = io.BytesIO()
-                image = PIL.Image.open(io.BytesIO(frame.data))
-        case PixelFormat.GREY:
-            data = frame.array
-            data.shape = frame.height, frame.width, -1
-            image = PIL.Image.frombuffer("L", (frame.width, frame.height), data)
-        case PixelFormat.YUYV:
-            data = frame.array
-            data.shape = frame.height, frame.width, -1
-            rgb = cv2.cvtColor(data, cv2.COLOR_YUV2RGB_YUYV)
-            image = PIL.Image.fromarray(rgb)
+    if frame.pixel_format in (PixelFormat.JPEG, PixelFormat.MJPEG):
+        if output == "jpeg":
+            return to_image_send(frame.data, type=output)
+        else:
+            buff = io.BytesIO()
+            image = PIL.Image.open(io.BytesIO(frame.data))
+    elif frame.pixel_format == PixelFormat.GREY:
+        data = frame.array
+        data.shape = frame.height, frame.width, -1
+        image = PIL.Image.frombuffer("L", (frame.width, frame.height), data)
+    elif frame.pixel_format == PixelFormat.YUYV:
+        data = frame.array
+        data.shape = frame.height, frame.width, -1
+        rgb = cv2.cvtColor(data, cv2.COLOR_YUV2RGB_YUYV)
+        image = PIL.Image.fromarray(rgb)
 
     buff = io.BytesIO()
     image.save(buff, output)
