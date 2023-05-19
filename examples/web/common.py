@@ -4,12 +4,6 @@
 # Copyright (c) 2023 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-# Extra dependencies required to run this example:
-# pip install fastapi jinja2 python-multipart cv2 pillow uvicorn
-
-# run from this directory with:
-# uvicorn async:app
-
 """Common tools for async and sync web app examples"""
 
 import io

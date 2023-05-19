@@ -5,7 +5,7 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 # install dependencies with:
-# pip install uvicorn fastapi
+# python3 -m pip install uvicorn fastapi
 #
 # run from this directory with:
 # uvicorn web_async:app
