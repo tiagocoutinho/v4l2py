@@ -4,6 +4,9 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
+# Extra dependency required to run this example:
+# python3 -m pip install flask
+
 # run from this directory with: FLASK_APP=web flask run -h 0.0.0.0
 
 import flask

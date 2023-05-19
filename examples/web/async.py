@@ -5,7 +5,8 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 # Extra dependencies required to run this example:
-# pip install fastapi jinja2 python-multipart cv2 pillow uvicorn
+# python3 -m pip install fastapi jinja2 python-multipart opencv-python \
+# pillow uvicorn
 
 # run from this directory with:
 # uvicorn async:app
@@ -88,7 +89,7 @@ def cameras() -> list[Camera]:
     global CAMERAS
     if CAMERAS is None:
         cameras = {}
-        for device in iter_video_capture_devices():
+        for device in iter_video_capture_devices(legacy_controls=True):
             cameras[device.index] = Camera(device)
         CAMERAS = cameras
     return CAMERAS
