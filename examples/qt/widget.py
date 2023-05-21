@@ -4,8 +4,11 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-# install requirements: pip install cv2 qtpy pyqt6
-# run with: QT_API=pyqt6 python widget.py
+# install extra requirements:
+# python3 -m pip install opencv-python qtpy pyqt6
+
+# run from this directory with:
+# QT_API=pyqt6 python widget.py
 
 import cv2
 from qtpy import QtCore, QtGui, QtWidgets
