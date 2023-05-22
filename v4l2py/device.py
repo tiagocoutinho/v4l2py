@@ -18,6 +18,7 @@ import os
 import pathlib
 import typing
 from io import IOBase
+from collections import UserDict
 
 from . import raw
 from .io import IO, fopen
@@ -306,9 +307,9 @@ def iter_read_menu(fd, ctrl):
         fd,
         IOC.QUERYMENU,
         qmenu,
-        start=ctrl.info.minimum,
-        stop=ctrl.info.maximum + 1,
-        step=ctrl.info.step,
+        start=ctrl._info.minimum,
+        stop=ctrl._info.maximum + 1,
+        step=ctrl._info.step,
         ignore_einval=True,
     ):
         yield copy.deepcopy(menu)
@@ -635,10 +636,10 @@ class ReentrantContextManager:
 
 
 class Device(ReentrantContextManager):
-    def __init__(self, name_or_file, read_write=True, io=IO):
+    def __init__(self, name_or_file, read_write=True, io=IO, legacy_controls=False):
         super().__init__()
         self.info = None
-        self.controls = Controls()
+        self.controls = None
         self.io = io
         if isinstance(name_or_file, (str, pathlib.Path)):
             filename = pathlib.Path(name_or_file)
@@ -658,6 +659,7 @@ class Device(ReentrantContextManager):
         self.log = log.getChild(filename.stem)
         self.filename = filename
         self.index = device_number(filename)
+        self.legacy_controls = legacy_controls
 
     def __repr__(self):
         return f"<{type(self).__name__} name={self.filename}, closed={self.closed}>"
@@ -677,9 +679,10 @@ class Device(ReentrantContextManager):
 
     def _init(self):
         self.info = read_info(self.fileno())
-        self.controls = Controls(
-            {ctrl.id: Control(self, ctrl) for ctrl in self.info.controls}
-        )
+        if self.legacy_controls:
+            self.controls = LegacyControls.from_device(self)
+        else:
+            self.controls = Controls.from_device(self)
 
     def open(self):
         if not self._fobj:
@@ -782,6 +785,27 @@ class Device(ReentrantContextManager):
 
 
 class Controls(dict):
+    @classmethod
+    def from_device(cls, device):
+        ctrl_type_map = {
+            ControlType.BOOLEAN: BooleanControl,
+            ControlType.INTEGER: IntegerControl,
+            ControlType.INTEGER64: Integer64Control,
+            ControlType.MENU: MenuControl,
+            ControlType.INTEGER_MENU: MenuControl,
+            ControlType.U8: U8Control,
+            ControlType.U16: U16Control,
+            ControlType.U32: U32Control,
+        }
+        ctrl_dict = dict()
+
+        for ctrl in device.info.controls:
+            ctrl_type = ControlType(ctrl.type)
+            ctrl_class = ctrl_type_map.get(ctrl_type, GenericControl)
+            ctrl_dict[ctrl.id] = ctrl_class(device, ctrl)
+
+        return cls(ctrl_dict)
+
     def __getattr__(self, key):
         try:
             return self[key]
@@ -802,12 +826,12 @@ class Controls(dict):
 
     def __missing__(self, key):
         for v in self.values():
-            if isinstance(v, Control) and (v.config_name == key):
+            if isinstance(v, BaseControl) and (v.config_name == key):
                 return v
         raise KeyError(key)
 
     def used_classes(self):
-        return {v.control_class for v in self.values() if isinstance(v, Control)}
+        return {v.control_class for v in self.values() if isinstance(v, BaseControl)}
 
     def with_class(self, control_class):
         if isinstance(control_class, ControlClass):
@@ -823,12 +847,12 @@ class Controls(dict):
             )
 
         for v in self.values():
-            if isinstance(v, Control) and (v.control_class == control_class):
+            if isinstance(v, BaseControl) and (v.control_class == control_class):
                 yield v
 
     def set_to_default(self):
         for v in self.values():
-            if not isinstance(v, Control):
+            if not isinstance(v, BaseControl):
                 continue
 
             try:
@@ -836,61 +860,79 @@ class Controls(dict):
             except AttributeError:
                 pass
 
-
-class MenuItem:
-    def __init__(self, item):
-        self.item = item
-        self.index = item.index
-        self.name = item.name.decode()
-
-    def __repr__(self):
-        return f"<{type(self).__name__} index={self.index} name={self.name}>"
+    def set_clipping(self, clipping: bool) -> None:
+        for v in self.values():
+            if isinstance(v, BaseNumericControl):
+                v.clipping = clipping
 
 
-def config_name(name: str) -> str:
-    res = name.lower()
-    for r in (", ", " "):
-        res = res.replace(r, "_")
-    return res
+class LegacyControls(Controls):
+    @classmethod
+    def from_device(cls, device):
+        ctrl_dict = dict()
+        for ctrl in device.info.controls:
+            ctrl_dict[ctrl.id] = LegacyControl(device, ctrl)
+        return cls(ctrl_dict)
 
 
-class Control:
+class BaseControl:
     def __init__(self, device, info):
         self.device = device
-        self.info = info
-        self.id = self.info.id
-        self.name = info.name.decode()
+        self._info = info
+        self.id = self._info.id
+        self.name = self._info.name.decode()
         self._config_name = None
         self.control_class = ControlClass(raw.V4L2_CTRL_ID2CLASS(self.id))
-        self.type = ControlType(self.info.type)
+        self.type = ControlType(self._info.type)
+
         try:
             self.standard = ControlID(self.id)
         except ValueError:
             self.standard = None
-        if self.type == ControlType.MENU:
-            self.menu = {
-                menu.index: MenuItem(menu)
-                for menu in iter_read_menu(self.device._fobj, self)
-            }
-        else:
-            self.menu = {}
 
     def __repr__(self):
-        repr = f"{self.config_name} type={self.type.name.lower()}"
-        if self.type != ControlType.BOOLEAN:
-            repr += f" min={self.info.minimum} max={self.info.maximum} step={self.info.step}"
-        repr += f" default={self.info.default_value}"
-        if not (self.info.flags & ControlFlag.WRITE_ONLY):
-            repr += f" value={self.value}"
+        repr = f"{self.config_name}"
 
-        flags = [flag.name.lower() for flag in ControlFlag if (self.info.flags & flag)]
-        if len(flags):
+        addrepr = self._get_repr()
+        addrepr = addrepr.strip()
+        if addrepr:
+            repr += f" {addrepr}"
+
+        flags = [
+            flag.name.lower()
+            for flag in ControlFlag
+            if ((self._info.flags & flag) == flag)
+        ]
+        if flags:
             repr += " flags=" + ",".join(flags)
 
         return f"<{type(self).__name__} {repr}>"
 
+    def _get_repr(self) -> str:
+        return ""
+
+    def _get_control(self):
+        value = get_control(self.device, self.id)
+        return value
+
+    def _set_control(self, value):
+        if not self.is_writeable:
+            reasons = []
+            if self.is_flagged_read_only:
+                reasons.append("read-only")
+            if self.is_flagged_inactive:
+                reasons.append("inactive")
+            if self.is_flagged_disabled:
+                reasons.append("disabled")
+            if self.is_flagged_grabbed:
+                reasons.append("grabbed")
+            raise AttributeError(
+                f"{self.__class__.__name__} {self.config_name} is not writeable: {', '.join(reasons)}"
+            )
+        set_control(self.device, self.id, value)
+
     @property
-    def config_name(self):
+    def config_name(self) -> str:
         if self._config_name is None:
             res = self.name.lower()
             for r in ("(", ")"):
@@ -901,54 +943,322 @@ class Control:
         return self._config_name
 
     @property
+    def is_flagged_disabled(self) -> bool:
+        return (self._info.flags & ControlFlag.DISABLED) == ControlFlag.DISABLED
+
+    @property
+    def is_flagged_grabbed(self) -> bool:
+        return (self._info.flags & ControlFlag.GRABBED) == ControlFlag.GRABBED
+
+    @property
+    def is_flagged_read_only(self) -> bool:
+        return (self._info.flags & ControlFlag.READ_ONLY) == ControlFlag.READ_ONLY
+
+    @property
+    def is_flagged_update(self) -> bool:
+        return (self._info.flags & ControlFlag.UPDATE) == ControlFlag.UPDATE
+
+    @property
+    def is_flagged_inactive(self) -> bool:
+        return (self._info.flags & ControlFlag.INACTIVE) == ControlFlag.INACTIVE
+
+    @property
+    def is_flagged_slider(self) -> bool:
+        return (self._info.flags & ControlFlag.SLIDER) == ControlFlag.SLIDER
+
+    @property
+    def is_flagged_write_only(self) -> bool:
+        return (self._info.flags & ControlFlag.WRITE_ONLY) == ControlFlag.WRITE_ONLY
+
+    @property
+    def is_flagged_volatile(self) -> bool:
+        return (self._info.flags & ControlFlag.VOLATILE) == ControlFlag.VOLATILE
+
+    @property
+    def is_flagged_has_payload(self) -> bool:
+        return (self._info.flags & ControlFlag.HAS_PAYLOAD) == ControlFlag.HAS_PAYLOAD
+
+    @property
+    def is_flagged_execute_on_write(self) -> bool:
+        return (
+            self._info.flags & ControlFlag.EXECUTE_ON_WRITE
+        ) == ControlFlag.EXECUTE_ON_WRITE
+
+    @property
+    def is_flagged_modify_layout(self) -> bool:
+        return (
+            self._info.flags & ControlFlag.MODIFY_LAYOUT
+        ) == ControlFlag.MODIFY_LAYOUT
+
+    @property
+    def is_flagged_dynamic_array(self) -> bool:
+        return (
+            self._info.flags & ControlFlag.DYNAMIC_ARRAY
+        ) == ControlFlag.DYNAMIC_ARRAY
+
+    @property
+    def is_writeable(self) -> bool:
+        return not (
+            self.is_flagged_read_only
+            or self.is_flagged_inactive
+            or self.is_flagged_disabled
+            or self.is_flagged_grabbed
+        )
+
+
+class BaseMonoControl(BaseControl):
+    def _get_repr(self) -> str:
+        repr = f" default={self.default}"
+        if not self.is_flagged_write_only:
+            repr += f" value={self.value}"
+        return repr
+
+    def _convert_read(self, value):
+        return value
+
+    @property
+    def default(self):
+        return self._convert_read(self._info.default_value)
+
+    @property
     def value(self):
-        if self.is_readable:
-            return get_control(self.device, self.id)
+        if not self.is_flagged_write_only:
+            v = self._get_control()
+            return self._convert_read(v)
         else:
             return None
 
+    def _convert_write(self, value):
+        return value
+
+    def _mangle_write(self, value):
+        return value
+
     @value.setter
     def value(self, value):
-        if not self.is_writeable:
-            raise AttributeError(f"Control {self.config_name} is read-only")
-        if value < self.info.minimum:
-            v = self.info.minimum
-        elif value > self.info.maximum:
-            v = self.info.maximum
-        else:
-            v = value
-        set_control(self.device, self.id, v)
-
-    @property
-    def is_readable(self):
-        return not (self.info.flags & ControlFlag.WRITE_ONLY)
-
-    @property
-    def is_writeable(self):
-        return not (self.info.flags & ControlFlag.READ_ONLY)
-
-    @property
-    def is_inactive(self):
-        return self.info.flags & ControlFlag.INACTIVE
-
-    @property
-    def is_grabbed(self):
-        return self.info.flags & ControlFlag.GRABBED
-
-    def set_to_minimum(self):
-        self.value = self.info.minimum
+        v = self._convert_write(value)
+        v = self._mangle_write(v)
+        self._set_control(v)
 
     def set_to_default(self):
-        self.value = self.info.default_value
+        self.value = self.default
 
-    def set_to_maximum(self):
-        self.value = self.info.maximum
+
+class GenericControl(BaseMonoControl):
+    pass
+
+
+class BaseNumericControl(BaseMonoControl):
+    lower_bound = -(2**31)
+    upper_bound = 2**31 - 1
+
+    def __init__(self, device, info, clipping=True):
+        super().__init__(device, info)
+        self.minimum = self._info.minimum
+        self.maximum = self._info.maximum
+        self.step = self._info.step
+        self.clipping = clipping
+
+        if self.minimum < self.lower_bound:
+            raise RuntimeWarning(
+                f"Control {self.config_name}'s claimed minimum value {self.minimum} exceeds lower bound of {self.__class__.__name__}"
+            )
+        if self.maximum > self.upper_bound:
+            raise RuntimeWarning(
+                f"Control {self.config_name}'s claimed maximum value {self.maximum} exceeds upper bound of {self.__class__.__name__}"
+            )
+
+    def _get_repr(self) -> str:
+        repr = f" min={self.minimum} max={self.maximum} step={self.step}"
+        repr += super()._get_repr()
+        return repr
+
+    def _convert_read(self, value):
+        return int(value)
+
+    def _convert_write(self, value):
+        if isinstance(value, int):
+            return value
+        else:
+            try:
+                v = int(value)
+            except Exception:
+                pass
+            else:
+                return v
+        raise ValueError(
+            f"Failed to coerce {value.__class__.__name__} '{value}' to int"
+        )
+
+    def _mangle_write(self, value):
+        if self.clipping:
+            if value < self.minimum:
+                return self.minimum
+            elif value > self.maximum:
+                return self.maximum
+        else:
+            if value < self.minimum:
+                raise ValueError(
+                    f"Control {self.config_name}: {value} exceeds allowed minimum {self.minimum}"
+                )
+            elif value > self.maximum:
+                raise ValueError(
+                    f"Control {self.config_name}: {value} exceeds allowed maximum {self.maximum}"
+                )
+        return value
 
     def increase(self, steps: int = 1):
-        self.value += steps * self.info.step
+        self.value += steps * self.step
 
     def decrease(self, steps: int = 1):
-        self.value -= steps * self.info.step
+        self.value -= steps * self.step
+
+    def set_to_minimum(self):
+        self.value = self.minimum
+
+    def set_to_maximum(self):
+        self.value = self.maximum
+
+
+class IntegerControl(BaseNumericControl):
+    lower_bound = -(2**31)
+    upper_bound = 2**31 - 1
+
+
+class Integer64Control(BaseNumericControl):
+    lower_bound = -(2**63)
+    upper_bound = 2**63 - 1
+
+
+class U8Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**8
+
+
+class U16Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**16
+
+
+class U32Control(BaseNumericControl):
+    lower_bound = 0
+    upper_bound = 2**32
+
+
+class BooleanControl(BaseMonoControl):
+    _true = ["true", "1", "yes", "on", "enable"]
+    _false = ["false", "0", "no", "off", "disable"]
+
+    def _convert_read(self, value):
+        return bool(value)
+
+    def _convert_write(self, value):
+        if isinstance(value, bool):
+            return value
+        elif isinstance(value, str):
+            if value in self._true:
+                return True
+            elif value in self._false:
+                return False
+        else:
+            try:
+                v = bool(value)
+            except Exception:
+                pass
+            else:
+                return v
+        raise ValueError(
+            f"Failed to coerce {value.__class__.__name__} '{value}' to bool"
+        )
+
+
+class MenuControl(BaseMonoControl, UserDict):
+    def __init__(self, device, info):
+        BaseControl.__init__(self, device, info)
+        UserDict.__init__(self)
+
+        if self.type == ControlType.MENU:
+            self.data = {
+                item.index: item.name.decode()
+                for item in iter_read_menu(self.device._fobj, self)
+            }
+        elif self.type == ControlType.INTEGER_MENU:
+            self.data = {
+                item.index: int(item.name)
+                for item in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            raise TypeError(
+                f"MenuControl only supports control types MENU or INTEGER_MENU, but not {self.type.name}"
+            )
+
+    def _convert_write(self, value):
+        return int(value)
+
+
+class ButtonControl(BaseControl):
+    def push(self):
+        self._set_control(1)
+
+
+class BaseCompoundControl(BaseControl):
+    def __init__(self, device, info):
+        raise NotImplementedError()
+
+
+class LegacyMenuItem:
+    def __init__(self, item: raw.v4l2_querymenu):
+        self.item = item
+        self.index = item.index
+        self.name = item.name.decode()
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} index={self.index} name={self.name}>"
+
+
+class LegacyControl(BaseNumericControl):
+    def __init__(self, device, info):
+        super().__init__(device, info)
+
+        self.info = self._info
+        if self.type == ControlType.MENU:
+            self.menu = {
+                menu.index: LegacyMenuItem(menu)
+                for menu in iter_read_menu(self.device._fobj, self)
+            }
+        else:
+            self.menu = {}
+
+    def _get_repr(self) -> str:
+        repr = f"type={self.type.name.lower()}"
+        repr += super()._get_repr()
+        return repr
+
+    @property
+    def is_writeonly(self) -> bool:
+        return self.is_flagged_write_only
+
+    @property
+    def is_readonly(self) -> bool:
+        return self.is_flagged_read_only
+
+    @property
+    def is_inactive(self) -> bool:
+        return self.is_flagged_inactive
+
+    @property
+    def is_grabbed(self) -> bool:
+        return self.is_flagged_grabbed
+
+    @property
+    def is_disabled(self) -> bool:
+        return self.is_flagged_disabled
+
+    def increase(self, steps: int = 1):
+        self.value += steps * self.step
+
+    def decrease(self, steps: int = 1):
+        self.value -= steps * self.step
 
 
 class DeviceHelper:

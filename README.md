@@ -87,34 +87,36 @@ Getting information about the device:
 Format(width=640, height=480, pixelformat=<PixelFormat.MJPEG: 1196444237>}
 
 >>> for ctrl in cam.controls.values(): print(ctrl)
-<Control brightness type=integer min=0 max=255 step=1 default=128 value=64>
-<Control contrast type=integer min=0 max=255 step=1 default=32 value=32>
-<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
-<Control hue type=integer min=-180 max=180 step=1 default=0 value=0>
-<Control white_balance_automatic type=boolean default=1 value=1>
-<Control gamma type=integer min=90 max=150 step=1 default=120 value=120>
-<Control gain type=integer min=1 max=7 step=1 default=1 value=1>
-<Control power_line_frequency type=menu min=0 max=2 step=1 default=2 value=2>
-<Control white_balance_temperature type=integer min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
-<Control sharpness type=integer min=0 max=7 step=1 default=2 value=2>
-<Control backlight_compensation type=integer min=0 max=1 step=1 default=0 value=0>
-<Control auto_exposure type=menu min=0 max=3 step=1 default=3 value=3>
-<Control exposure_time_absolute type=integer min=10 max=333 step=1 default=156 value=156 flags=inactive>
-<Control exposure_dynamic_framerate type=boolean default=0 value=1>```
+<IntegerControl brightness min=0 max=255 step=1 default=128 value=128>
+<IntegerControl contrast min=0 max=255 step=1 default=32 value=32>
+<IntegerControl saturation min=0 max=100 step=1 default=64 value=64>
+<IntegerControl hue min=-180 max=180 step=1 default=0 value=0>
+<BooleanControl white_balance_automatic default=True value=True>
+<IntegerControl gamma min=90 max=150 step=1 default=120 value=120>
+<MenuControl power_line_frequency default=1 value=1>
+<IntegerControl white_balance_temperature min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<IntegerControl sharpness min=0 max=7 step=1 default=2 value=2>
+<IntegerControl backlight_compensation min=0 max=2 step=1 default=1 value=1>
+<MenuControl auto_exposure default=3 value=3>
+<IntegerControl exposure_time_absolute min=4 max=1250 step=1 default=156 value=156 flags=inactive>
+<BooleanControl exposure_dynamic_framerate default=False value=False>
 
 >>> cam.controls["saturation"]
-<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
+<IntegerControl saturation min=0 max=100 step=1 default=64 value=64>
+
 >>> cam.controls["saturation"].id
 9963778
 >>> cam.controls[9963778]
-<Control saturation type=integer min=0 max=100 step=1 default=64 value=64>
+<IntegerControl saturation min=0 max=100 step=1 default=64 value=64>
 
 >>> cam.controls.brightness
-<Control brightness type=integer min=0 max=255 step=1 default=128 value=64>
->>> cam.controls.brightness.value = 128
+<IntegerControl brightness min=0 max=255 step=1 default=128 value=128>
+>>> cam.controls.brightness.value = 64
 >>> cam.controls.brightness
-<Control brightness type=integer min=0 max=255 step=1 default=128 value=128>
+<IntegerControl brightness min=0 max=255 step=1 default=128 value=64>
 ```
+
+(see also [v4l2py-ctl](examples/v4l2py-ctl.py) example)
 
 ### asyncio
 
@@ -221,6 +223,97 @@ with Device.from_id(0) as cam:
         frame = bytes(frame)  # or frame = frame.data
         buff = io.BytesIO(frame)
 ```
+
+## Improved device controls
+
+Device controls have been improved to provide a more pythonic interface. The
+new interface is the default now; however, the legacy interface can be
+requested: `Device.from_id(x, legacy_controls=True)`.
+
+Before:
+```python
+>>> from v4l2py import Device
+>>> cam = Device.from_id(0)
+>>> cam.open()
+>>> for ctrl in cam.controls.values():
+...     print(ctrl)
+...     for item in ctrl.menu.values():
+...             print(f" - {item.index}: {item.name}")
+<Control brightness type=integer min=0 max=255 step=1 default=128 value=255>
+<Control contrast type=integer min=0 max=255 step=1 default=32 value=255>
+<Control saturation type=integer min=0 max=100 step=1 default=64 value=100>
+<Control hue type=integer min=-180 max=180 step=1 default=0 value=0>
+<Control white_balance_automatic type=boolean min=0 max=1 step=1 default=1 value=1>
+<Control gamma type=integer min=90 max=150 step=1 default=120 value=150>
+<Control gain type=integer min=1 max=7 step=1 default=1 value=1>
+<Control power_line_frequency type=menu min=0 max=2 step=1 default=2 value=2>
+ - 0: Disabled
+ - 1: 50 Hz
+ - 2: 60 Hz
+<Control white_balance_temperature type=integer min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<Control sharpness type=integer min=0 max=7 step=1 default=2 value=7>
+<Control backlight_compensation type=integer min=0 max=1 step=1 default=0 value=1>
+<Control auto_exposure type=menu min=0 max=3 step=1 default=3 value=3>
+ - 1: Manual Mode
+ - 3: Aperture Priority Mode
+<Control exposure_time_absolute type=integer min=10 max=333 step=1 default=156 value=156 flags=inactive>
+<Control exposure_dynamic_framerate type=boolean min=0 max=1 step=1 default=0 value=1>
+
+>>> type(cam.controls.exposure_dynamic_framerate.value)
+<class 'int'>
+```
+
+Now:
+```python
+>>> from v4l2py.device import Device, MenuControl
+>>> cam = Device.from_id(0)
+>>> cam.open()
+>>> for ctrl in cam.controls.values():
+...     print(ctrl)
+...     if isinstance(ctrl, MenuControl):
+...             for (index, name) in ctrl.items():
+...                     print(f" - {index}: {name}")
+<IntegerControl brightness min=0 max=255 step=1 default=128 value=255>
+<IntegerControl contrast min=0 max=255 step=1 default=32 value=255>
+<IntegerControl saturation min=0 max=100 step=1 default=64 value=100>
+<IntegerControl hue min=-180 max=180 step=1 default=0 value=0>
+<BooleanControl white_balance_automatic default=True value=True>
+<IntegerControl gamma min=90 max=150 step=1 default=120 value=150>
+<IntegerControl gain min=1 max=7 step=1 default=1 value=1>
+<MenuControl power_line_frequency default=2 value=2>
+ - 0: Disabled
+ - 1: 50 Hz
+ - 2: 60 Hz
+<IntegerControl white_balance_temperature min=2800 max=6500 step=1 default=4000 value=4000 flags=inactive>
+<IntegerControl sharpness min=0 max=7 step=1 default=2 value=7>
+<IntegerControl backlight_compensation min=0 max=1 step=1 default=0 value=1>
+<MenuControl auto_exposure default=3 value=3>
+ - 1: Manual Mode
+ - 3: Aperture Priority Mode
+<IntegerControl exposure_time_absolute min=10 max=333 step=1 default=156 value=156 flags=inactive>
+<BooleanControl exposure_dynamic_framerate default=False value=True>
+
+>>> type(cam.controls.white_balance_automatic.value)
+<class 'bool'>
+>>> cam.controls.white_balance_automatic.value
+<BooleanControl white_balance_automatic default=True value=True>
+>>> cam.controls.white_balance_automatic.value = False
+<BooleanControl white_balance_automatic default=True value=False>
+
+>>> wba = cam.controls.white_balance_automatic
+>>> wba.value = "enable"    # or "on", "1", "true", "yes"
+>>> wba
+<BooleanControl white_balance_automatic default=True value=True>
+>>> wba.value = "off"       # or "disable", "0", "false", "no"
+>>> wba
+<BooleanControl white_balance_automatic default=True value=False>
+```
+
+The initial upgrade path for existing code is to request the legacy interface
+by passing `legacy_controls=True` when instantiating the `Device` object, use
+`LegacyControl` instead of `Control` for instantiations, and `BaseControl`
+for isinstance() checks. And in the unlikely case your code does isinstance()
+checks for `MenuItem`, these should be changed to `LegacyMenuItem`.
 
 ## References
 

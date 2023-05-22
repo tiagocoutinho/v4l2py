@@ -5,7 +5,7 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 # Extra dependencies required to run this example:
-# pip install pillow cv2 flask gunicorn gevent
+# python3 -m pip install pillow opencv-python flask gunicorn gevent
 
 # run from this directory with:
 # gunicorn --bind=0.0.0.0:8000 --log-level=debug --worker-class=gevent sync:app
