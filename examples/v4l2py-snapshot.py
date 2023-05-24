@@ -1,7 +1,21 @@
+#
+# install (optional) extra dependencies for extended functionality:
+# python3 -m pip install Pillow
+
 import argparse
 import time
 import datetime
 import sys
+
+try:
+    from PIL import Image
+except ModuleNotFoundError:
+    HAVE_PIL = False
+else:
+    HAVE_PIL = True
+
+if HAVE_PIL:
+    import io
 
 from v4l2py.device import Device, VideoCapture, PixelFormat
 from v4l2py.device import iter_video_capture_devices, Capability
@@ -67,12 +81,33 @@ def take_snapshot(args):
     return frame
 
 
-def save_snapshot(frame, args):
+def save_snapshot_raw(frame, args):
     now = datetime.datetime.now()
     fname = now.strftime(args.filename)
-    print(f"Saving as {fname} ...")
+    print(f"Saving as {fname} (raw)...")
     with open(fname, "wb") as f:
         f.write(frame.data)
+
+
+def postprocess_snapshot(img, args):
+    if args.mirror_horizontal:
+        print("Mirroring horizintally ...")
+        img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    if args.mirror_vertical:
+        print("Mirroring vertically ...")
+        img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    if args.rotate != 0:
+        print(f"Rotating {args.rotate} degrees counter-clockwise ...")
+        img = img.rotate(args.rotate, expand=1)
+
+    return img
+
+
+def save_snapshot_pil(img, args):
+    now = datetime.datetime.now()
+    fname = now.strftime(args.filename)
+    print(f"Saving as {fname} (pillow)...")
+    img.save(fname)
 
 
 if __name__ == "__main__":
@@ -121,6 +156,27 @@ if __name__ == "__main__":
         help="list all video capture devices",
     )
 
+    if HAVE_PIL:
+        postproc = parser.add_argument_group("Postprocessing")
+        postproc.add_argument(
+            "--mirror-horizontal",
+            default=False,
+            action="store_true",
+            help="mirror snapshot horizontally"
+        )
+        postproc.add_argument(
+            "--mirror-vertical",
+            default=False,
+            action="store_true",
+            help="mirror snapshot vertically"
+        )
+        postproc.add_argument(
+            "--rotate",
+            type=int,
+            default=0,
+            help="rotate snapshot counter-clockwise"
+        )
+
     args = parser.parse_args()
 
     if args.device.isdigit():
@@ -130,6 +186,11 @@ if __name__ == "__main__":
         list_devices()
     else:
         frame = take_snapshot(args)
-        save_snapshot(frame, args)
+        if HAVE_PIL:
+            img = Image.open(io.BytesIO(frame.data))
+            img = postprocess_snapshot(img, args)
+            save_snapshot_pil(img, args)
+        else:
+            save_snapshot_raw(frame, args)
 
     print("Done.")
