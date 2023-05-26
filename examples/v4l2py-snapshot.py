@@ -162,19 +162,16 @@ if __name__ == "__main__":
             "--mirror-horizontal",
             default=False,
             action="store_true",
-            help="mirror snapshot horizontally"
+            help="mirror snapshot horizontally",
         )
         postproc.add_argument(
             "--mirror-vertical",
             default=False,
             action="store_true",
-            help="mirror snapshot vertically"
+            help="mirror snapshot vertically",
         )
         postproc.add_argument(
-            "--rotate",
-            type=int,
-            default=0,
-            help="rotate snapshot counter-clockwise"
+            "--rotate", type=int, default=0, help="rotate snapshot counter-clockwise"
         )
 
     args = parser.parse_args()
