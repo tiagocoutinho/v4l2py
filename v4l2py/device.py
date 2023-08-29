@@ -1186,6 +1186,7 @@ class MenuControl(BaseMonoControl, UserDict):
             self.data = {
                 item.index: int(item.name)
                 for item in iter_read_menu(self.device._fobj, self)
+                if item.name != b''
             }
         else:
             raise TypeError(
