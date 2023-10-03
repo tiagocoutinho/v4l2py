@@ -1152,7 +1152,7 @@ class v4l2_ext_control(ctypes.Structure):
     _fields_ = [
         ("id", ctypes.c_uint32),
         ("size", ctypes.c_uint32),
-        ("reserved2", ctypes.c_uint32 * 2),
+        ("reserved2", ctypes.c_uint32 * 1),
         ("_u", _u),
     ]
 
@@ -1165,7 +1165,7 @@ class v4l2_ext_controls(ctypes.Structure):
         ("ctrl_class", ctypes.c_uint32),
         ("count", ctypes.c_uint32),
         ("error_idx", ctypes.c_uint32),
-        ("reserved", ctypes.c_uint32 * 1),
+        ("reserved", ctypes.c_uint32 * 2),
         ("controls", ctypes.POINTER(v4l2_ext_control)),
     ]
 
