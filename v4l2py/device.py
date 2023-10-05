@@ -684,6 +684,9 @@ class Device(ReentrantContextManager):
         else:
             self.controls = Controls.from_device(self)
 
+    def _reset(self):
+        self.controls = None
+
     def open(self):
         if not self._fobj:
             self.log.info("opening %s", self.filename)
@@ -696,6 +699,7 @@ class Device(ReentrantContextManager):
             self.log.info("closing %s (%s)", self.filename, self.info.card)
             self._fobj.close()
             self._fobj = None
+            self._reset()
             self.log.info("closed %s (%s)", self.filename, self.info.card)
 
     def fileno(self):
@@ -829,6 +833,9 @@ class Controls(dict):
             if isinstance(v, BaseControl) and (v.config_name == key):
                 return v
         raise KeyError(key)
+
+    def named_keys(self):
+        return [v.config_name for v in self.values() if isinstance(v, BaseControl)]
 
     def used_classes(self):
         return {v.control_class for v in self.values() if isinstance(v, BaseControl)}
@@ -1156,9 +1163,10 @@ class BooleanControl(BaseMonoControl):
         if isinstance(value, bool):
             return value
         elif isinstance(value, str):
-            if value in self._true:
+            v = value.lower()
+            if v in self._true:
                 return True
-            elif value in self._false:
+            elif v in self._false:
                 return False
         else:
             try:
