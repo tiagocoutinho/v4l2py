@@ -70,6 +70,13 @@ class timeval(ctypes.Structure):
     ]
 
 
+class timespec(ctypes.Structure):
+    _fields_ = [
+        ("secs", ctypes.c_long),
+        ("nsecs", ctypes.c_long),
+    ]
+
+
 #
 # v4l2
 #
@@ -2069,6 +2076,115 @@ class v4l2_dbg_chip_ident(ctypes.Structure):
     _pack_ = True
 
 
+## Events
+
+V4L2_EVENT_ALL = 0
+V4L2_EVENT_VSYNC = 1
+V4L2_EVENT_EOS = 2
+V4L2_EVENT_CTRL = 3
+V4L2_EVENT_FRAME_SYNC = 4
+V4L2_EVENT_SOURCE_CHANGE = 5
+V4L2_EVENT_MOTION_DET = 6
+V4L2_EVENT_PRIVATE_START = 0x08000000
+
+
+class v4l2_event_vsync(ctypes.Structure):
+    _fields_ = [
+        ("field", ctypes.c_uint8),
+    ]
+
+    _pack_ = True
+
+
+V4L2_EVENT_CTRL_CH_VALUE = 1 << 0
+V4L2_EVENT_CTRL_CH_FLAGS = 1 << 1
+V4L2_EVENT_CTRL_CH_RANGE = 1 << 2
+V4L2_EVENT_CTRL_CH_DIMENSIONS = 1 << 3
+
+
+class v4l2_event_ctrl(ctypes.Structure):
+    class _u(ctypes.Union):
+        _fields_ = [
+            ("value", ctypes.c_int32),
+            ("value64", ctypes.c_int64),
+        ]
+
+    _fields_ = [
+        ("changes", ctypes.c_uint32),
+        ("type", ctypes.c_uint32),
+        ("_u", _u),
+        ("flags", ctypes.c_uint32),
+        ("minimum", ctypes.c_int32),
+        ("maximum", ctypes.c_int32),
+        ("setp", ctypes.c_int32),
+        ("default_value", ctypes.c_int32),
+    ]
+
+
+V4L2_EVENT_SRC_CH_RESOLUTION = 1 << 0
+
+
+class v4l2_event_frame_sync(ctypes.Structure):
+    _fields_ = [
+        ("frame_sequence", ctypes.c_uint32),
+    ]
+
+
+V4L2_EVENT_SRC_CH_RESOLUTION = 1 << 0
+
+
+class v4l2_event_src_change(ctypes.Structure):
+    _fields_ = [
+        ("changes", ctypes.c_uint32),
+    ]
+
+
+V4L2_EVENT_MD_FL_HAVE_FRAME_SEQ = 1 << 0
+
+
+class v4l2_event_motion_det(ctypes.Structure):
+    _fields_ = [
+        ("flags", ctypes.c_uint32),
+        ("frame_sequence", ctypes.c_uint32),
+        ("region_mask", ctypes.c_uint32),
+    ]
+
+
+class v4l2_event(ctypes.Structure):
+    class _u(ctypes.Union):
+        _fields_ = [
+            ("vsync", v4l2_event_vsync),
+            ("ctrl", v4l2_event_ctrl),
+            ("frame_sync", v4l2_event_frame_sync),
+            ("src_change", v4l2_event_src_change),
+            ("motion_det", v4l2_event_motion_det),
+            ("data", ctypes.c_char * 64),
+        ]
+
+    _fields_ = [
+        ("type", ctypes.c_uint32),
+        ("_u", _u),
+        ("pending", ctypes.c_uint32),
+        ("sequence", ctypes.c_uint32),
+        ("timestamp", timespec),
+        ("id", ctypes.c_uint32),
+        ("reserved", ctypes.c_uint32 * 8),
+    ]
+
+
+V4L2_EVENT_SUB_FL_SEND_INITIAL = 1 << 0
+V4L2_EVENT_SUB_FL_ALLOW_FEEDBACK = 1 << 1
+
+
+class v4l2_event_subscription(ctypes.Structure):
+    _fields_ = [
+        ("type", ctypes.c_uint32),
+        ("id", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("reserved", ctypes.c_uint32 * 5),
+    ]
+
+
 #
 # ioctl codes for video devices
 #
@@ -2147,6 +2263,9 @@ VIDIOC_G_DV_PRESET = _IOWR("V", 85, v4l2_dv_preset)
 VIDIOC_QUERY_DV_PRESET = _IOR("V", 86, v4l2_dv_preset)
 VIDIOC_S_DV_TIMINGS = _IOWR("V", 87, v4l2_dv_timings)
 VIDIOC_G_DV_TIMINGS = _IOWR("V", 88, v4l2_dv_timings)
+VIDIOC_DQEVENT = _IOR("V", 89, v4l2_event)
+VIDIOC_SUBSCRIBE_EVENT = _IOW("V", 90, v4l2_event_subscription)
+VIDIOC_UNSUBSCRIBE_EVENT = _IOW("V", 91, v4l2_event_subscription)
 
 VIDIOC_G_SELECTION = _IOWR("V", 94, v4l2_selection)
 VIDIOC_S_SELECTION = _IOWR("V", 95, v4l2_selection)
