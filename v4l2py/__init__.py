@@ -6,6 +6,8 @@
 
 # ruff: noqa: F401
 
+import warnings
+
 from .device import (
     Device,
     Frame,
@@ -19,4 +21,8 @@ from .device import (
 )
 from .io import IO, GeventIO
 
-__version__ = "2.3.0"
+__version__ = "3.0.0"
+
+warnings.warn(
+    "v4l2py is no longer being maintained. Please consider using linuxpy.video instead"
+)

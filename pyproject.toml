@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Multimedia :: Video :: Capture",
 ]
-dependencies = []
+dependencies = ["linuxpy>=0.9.0"]
 dynamic = ["version", "readme"]
 
 [project.urls]
