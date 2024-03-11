@@ -2,7 +2,7 @@
 
 **Since version 3.0 this project is now a shim for `linuxpy.video`**
 
-**Please consider using [linuxpy](https/github.com/tiagocoutinho/linuxpy) directly.**
+**Please consider using [linuxpy](https://github.com/tiagocoutinho/linuxpy) directly.**
 
 [![V4L2py][pypi-version]](https://pypi.python.org/pypi/v4l2py)
 [![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/v4l2py)
@@ -17,7 +17,7 @@ A two purpose API:
 * raw python binding for the v4l2 (video4linux2) userspace API, using ctypes (don't even
   bother wasting your time here. You probably won't use it)
 
-Only works on python >= 3.7.
+Only works on python >= 3.9.
 
 ## Why?
 
