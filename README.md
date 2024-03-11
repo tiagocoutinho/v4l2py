@@ -1,5 +1,9 @@
 # v4l2py
 
+**Since version 3.0 this project is now a shim for `linuxpy.video`**
+
+**Please consider using [linuxpy](https/github.com/tiagocoutinho/linuxpy) directly.**
+
 [![V4L2py][pypi-version]](https://pypi.python.org/pypi/v4l2py)
 [![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/v4l2py)
 ![License][license]

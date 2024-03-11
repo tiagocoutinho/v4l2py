@@ -4,7 +4,8 @@
 # Copyright (c) 2021 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
-from contextlib import ExitStack
+import os
+from contextlib import ExitStack, contextmanager
 from errno import EINVAL
 from inspect import isgenerator
 from math import isclose
@@ -62,11 +63,11 @@ class Hardware:
 
     def __enter__(self):
         self.stack = ExitStack()
-        ioctl = mock.patch("v4l2py.device.fcntl.ioctl", self.ioctl)
-        opener = mock.patch("v4l2py.io.open", self.open)
-        mmap = mock.patch("v4l2py.device.mmap.mmap", self.mmap)
-        select = mock.patch("v4l2py.io.IO.select", self.select)
-        blocking = mock.patch("v4l2py.device.os.get_blocking", self.get_blocking)
+        ioctl = mock.patch("linuxpy.ioctl.fcntl.ioctl", self.ioctl)
+        opener = mock.patch("linuxpy.io.open", self.open)
+        mmap = mock.patch("linuxpy.video.device.mmap.mmap", self.mmap)
+        select = mock.patch("linuxpy.io.IO.select", self.select)
+        blocking = mock.patch("linuxpy.device.os.get_blocking", self.get_blocking)
         self.stack.enter_context(ioctl)
         self.stack.enter_context(opener)
         self.stack.enter_context(mmap)
@@ -99,37 +100,38 @@ class Hardware:
             if arg.index > 0:
                 raise OSError(EINVAL, "ups!")
             arg.name = self.input0_name
-            arg.type = raw.V4L2_INPUT_TYPE_CAMERA
+            arg.type = raw.InputType.CAMERA
         elif isinstance(arg, raw.v4l2_query_ext_ctrl):
             if arg.index > 0:
                 raise OSError(EINVAL, "ups!")
             arg.name = b"brightness"
-            arg.type = raw.V4L2_CTRL_TYPE_INTEGER
+            arg.type = raw.CtrlType.INTEGER
             arg.id = 9963776
         elif isinstance(arg, raw.v4l2_capability):
             arg.driver = self.driver
             arg.card = self.card
             arg.bus_info = self.bus_info
             arg.version = self.version
+            arg.capabilities = raw.Capability.STREAMING | raw.Capability.VIDEO_CAPTURE
         elif isinstance(arg, raw.v4l2_format):
-            if ioc == raw.VIDIOC_G_FMT:
+            if ioc == raw.IOC.G_FMT:
                 arg.fmt.pix.width = 640
                 arg.fmt.pix.height = 480
-                arg.fmt.pix.pixelformat = raw.V4L2_PIX_FMT_RGB24
+                arg.fmt.pix.pixelformat = raw.PixelFormat.RGB24
         elif isinstance(arg, raw.v4l2_buffer):
-            if ioc == raw.VIDIOC_QUERYBUF:
+            if ioc == raw.IOC.QUERYBUF:
                 pass
-            elif ioc == raw.VIDIOC_DQBUF:
+            elif ioc == raw.IOC.DQBUF:
                 arg.index = 0
                 arg.bytesused = len(self.frame)
                 arg.sequence = 123
                 arg.timestamp.secs = 123
                 arg.timestamp.usecs = 456789
-        elif ioc == raw.VIDIOC_STREAMON:
-            assert arg.value == raw.V4L2_BUF_TYPE_VIDEO_CAPTURE
+        elif ioc == raw.IOC.STREAMON:
+            assert arg.value == raw.BufType.VIDEO_CAPTURE
             self.video_capture_state = "ON"
-        elif ioc == raw.VIDIOC_STREAMOFF:
-            assert arg.value == raw.V4L2_BUF_TYPE_VIDEO_CAPTURE
+        elif ioc == raw.IOC.STREAMOFF:
+            assert arg.value == raw.BufType.VIDEO_CAPTURE
             self.video_capture_state = "OFF"
         return 0
 
@@ -137,7 +139,7 @@ class Hardware:
         assert self.fd == fd
         return MemoryMap(self)
 
-    def select(self, readers, writers, other):
+    def select(self, readers, writers, other, timeout=None):
         assert readers[0].fileno() == self.fd
         return readers, writers, other
 
@@ -165,6 +167,18 @@ def assert_frame(frame, camera):
         assert numpy.all(frame.array == numpy.frombuffer(camera.frame, dtype="u1"))
 
 
+@contextmanager
+def video_files(paths=("/dev/video99")):
+    with mock.patch("linuxpy.device.pathlib.Path.glob") as glob:
+        expected_files = list(paths)
+        glob.return_value = expected_files
+        with mock.patch("linuxpy.device.pathlib.Path.is_char_device") as is_char_device:
+            is_char_device.return_value = True
+            with mock.patch("linuxpy.device.os.access") as access:
+                access.return_value = os.R_OK | os.W_OK
+                yield paths
+
+
 @test("device number")
 def _(
     filename=each("/dev/video0", "/dev/video1", "/dev/video999"),
@@ -175,10 +189,7 @@ def _(
 
 @test("video files")
 def _():
-    with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
-        expected_files = ["/dev/video0", "/dev/video55"]
-        glob.return_value = expected_files
-
+    with video_files(["/dev/video0", "/dev/video55"]) as expected_files:
         assert list(iter_video_files()) == expected_files
 
 
@@ -186,9 +197,7 @@ def _():
 def _():
     assert isgenerator(iter_devices())
 
-    with mock.patch("v4l2py.device.pathlib.Path.glob") as glob:
-        expected_files = ["/dev/video0", "/dev/video55"]
-        glob.return_value = expected_files
+    with video_files(["/dev/video0", "/dev/video55"]) as expected_files:
         devices = list(iter_devices())
         assert len(devices) == 2
         for device in devices:
